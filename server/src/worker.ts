@@ -18,6 +18,7 @@ const aiResponseSchema = z.object({
     linkedinTeaser: z.string(),
     xingSummary: z.string(),
     seoTitle: z.string(),
+    seoDescription: z.string(),
     slug: z.string(),
 });
 
@@ -31,9 +32,10 @@ const responseSchema = {
         linkedinTeaser: { type: Type.STRING },
         xingSummary: { type: Type.STRING },
         seoTitle: { type: Type.STRING },
+        seoDescription: { type: Type.STRING },
         slug: { type: Type.STRING },
     },
-    required: ['markdownContent', 'linkedinTeaser', 'xingSummary', 'seoTitle', 'slug'],
+    required: ['markdownContent', 'linkedinTeaser', 'xingSummary', 'seoTitle', 'seoDescription', 'slug'],
 };
 
 // 3. Robuste KI-Funktion
@@ -63,6 +65,7 @@ async function generateArticleContent(rawText: string): Promise<ValidatedArticle
             - LinkedIn Teaser: Kurzer, knackiger Text (ca. 2-3 Sätze) für LinkedIn
             - Xing Summary: Etwas längere Zusammenfassung für Xing
             - SEO Title: Optimierter Titel für Suchmaschinen
+            - SEO Description: Ein ansprechender Meta-Description-Text (max. 160 Zeichen)
             - Slug: URL-freundlicher Slug
             
             Wichtige Hinweise:
@@ -83,6 +86,7 @@ async function generateArticleContent(rawText: string): Promise<ValidatedArticle
                 "linkedinTeaser": "...",
                 "xingSummary": "...",
                 "seoTitle": "...",
+                "seoDescription": "...",
                 "slug": "..."
             }`
         }
@@ -135,7 +139,9 @@ const worker = new Worker('content-queue', async (job: Job) => {
                 markdownContent: validatedData.markdownContent,
                 linkedinTeaser: validatedData.linkedinTeaser,
                 xingSummary: validatedData.xingSummary,
-                title: validatedData.seoTitle,
+                title: validatedData.seoTitle, // keep title as seoTitle for now
+                seoTitle: validatedData.seoTitle,
+                seoDescription: validatedData.seoDescription,
                 slug: validatedData.slug,
                 status: 'COMPLETED',
                 rawTranscript: rawText

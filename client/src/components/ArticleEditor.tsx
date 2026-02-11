@@ -9,9 +9,9 @@ import { getArticle, updateArticle } from '../api';
 import { Loader2, Link as LinkIcon, Bold, Italic, List, Heading2, Code, ArrowLeft, Save, UploadCloud, Calendar } from 'lucide-react';
 import { Button } from './ui/Button';
 import { toast } from 'sonner';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '../lib/utils';
-import type { ArticleStatus } from '../types';
+import type { Article, ArticleStatus } from '../types';
 import { ScheduleModal } from './ScheduleModal';
 
 export const ArticleEditor: React.FC = () => {
@@ -20,6 +20,15 @@ export const ArticleEditor: React.FC = () => {
     const queryClient = useQueryClient();
     const [content, setContent] = useState('');
     const [showScheduleModal, setShowScheduleModal] = useState(false);
+    const [showInfoSidebar, setShowInfoSidebar] = useState(false);
+    const [showTranscriptModal, setShowTranscriptModal] = useState(false);
+
+    // Editable Metadata State
+    const [seoTitle, setSeoTitle] = useState('');
+    const [seoDescription, setSeoDescription] = useState('');
+    const [linkedinTeaser, setLinkedinTeaser] = useState('');
+    const [xingSummary, setXingSummary] = useState('');
+
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const previewRef = useRef<HTMLDivElement>(null);
 
@@ -30,14 +39,17 @@ export const ArticleEditor: React.FC = () => {
     });
 
     useEffect(() => {
-        if (article?.markdownContent) {
-            setContent(article.markdownContent);
+        if (article) {
+            if (article.markdownContent) setContent(article.markdownContent);
+            setSeoTitle(article.seoTitle || article.title || '');
+            setSeoDescription(article.seoDescription || '');
+            setLinkedinTeaser(article.linkedinTeaser || '');
+            setXingSummary(article.xingSummary || '');
         }
     }, [article]);
 
-    // ... inside component
     const updateMutation = useMutation({
-        mutationFn: (data: { markdownContent?: string; status?: ArticleStatus; scheduledAt?: string }) => updateArticle(id!, data),
+        mutationFn: (data: Partial<Article>) => updateArticle(id!, data),
         onSuccess: (data) => {
             queryClient.invalidateQueries({ queryKey: ['article', id] });
             if (data.status === 'PUBLISHED') {
@@ -47,7 +59,7 @@ export const ArticleEditor: React.FC = () => {
             } else if (data.status === 'DRAFT') {
                 toast.success('Article unpublished (Draft).');
             } else {
-                toast.success('Article saved successfully!');
+                toast.success('Changes saved successfully!');
             }
         },
         onError: () => {
@@ -55,17 +67,36 @@ export const ArticleEditor: React.FC = () => {
         }
     });
 
+    const getMetadataPayload = () => ({
+        seoTitle,
+        seoDescription,
+        linkedinTeaser,
+        xingSummary
+    });
+
     const handleSave = () => {
-        updateMutation.mutate({ markdownContent: content });
+        updateMutation.mutate({
+            markdownContent: content,
+            ...getMetadataPayload()
+        });
     };
 
     const handlePublish = () => {
-        updateMutation.mutate({ markdownContent: content, status: 'PUBLISHED' });
+        updateMutation.mutate({
+            markdownContent: content,
+            status: 'PUBLISHED',
+            ...getMetadataPayload()
+        });
     };
 
     const handleSchedule = (dateTime: Date) => {
         const isoString = dateTime.toISOString();
-        updateMutation.mutate({ markdownContent: content, status: 'SCHEDULED', scheduledAt: isoString });
+        updateMutation.mutate({
+            markdownContent: content,
+            status: 'SCHEDULED',
+            scheduledAt: isoString,
+            ...getMetadataPayload()
+        });
     };
 
     const insertText = (before: string, after: string = '') => {
@@ -102,7 +133,7 @@ export const ArticleEditor: React.FC = () => {
         <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="flex flex-col h-full bg-background transition-all duration-500"
+            className="flex flex-col h-full bg-background transition-all duration-500 overflow-hidden"
         >
             {/* Minimalist Floating Toolbar */}
             <header className="h-16 flex items-center justify-between px-6 border-b border-border/40 backdrop-blur-xl bg-background/80 sticky top-0 z-40">
@@ -110,8 +141,8 @@ export const ArticleEditor: React.FC = () => {
                     <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="hover:bg-muted text-muted-foreground">
                         <ArrowLeft size={18} />
                     </Button>
-                    <div>
-                        <h1 className="text-sm font-semibold text-foreground truncate max-w-[200px] sm:max-w-md">{article.title}</h1>
+                    <div className="min-w-0">
+                        <h1 className="text-sm font-semibold text-foreground truncate max-w-[150px] sm:max-w-md">{article.title}</h1>
                         <div className="flex items-center gap-2">
                             <p className="text-[10px] text-muted-foreground flex items-center gap-1">
                                 <span className={cn("w-1.5 h-1.5 rounded-full", article.status === 'PUBLISHED' ? "bg-emerald-500" : article.status === 'SCHEDULED' ? "bg-blue-500" : "bg-amber-500")}></span>
@@ -131,10 +162,10 @@ export const ArticleEditor: React.FC = () => {
                                     href={article.sourceUrl}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="text-[10px] text-indigo-400 hover:text-indigo-300 flex items-center gap-1 hover:underline truncate max-w-[300px]"
+                                    className="text-[10px] text-indigo-400 hover:text-indigo-300 flex items-center gap-1 hover:underline truncate max-w-[200px]"
                                 >
                                     <LinkIcon size={10} />
-                                    {article.sourceUrl}
+                                    Source
                                 </a>
                             )}
                         </div>
@@ -142,6 +173,18 @@ export const ArticleEditor: React.FC = () => {
                 </div>
 
                 <div className="flex items-center gap-3">
+                    <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setShowInfoSidebar(!showInfoSidebar)}
+                            className={cn("gap-2", showInfoSidebar && "bg-indigo-500/10 text-indigo-500")}
+                        >
+                            <LinkIcon size={16} />
+                            Info
+                        </Button>
+                    </motion.div>
+
                     {(article.status === 'PUBLISHED' || article.status === 'SCHEDULED') && (
                         <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
                             <Button
@@ -202,65 +245,210 @@ export const ArticleEditor: React.FC = () => {
 
             {/* Editor Workspace */}
             <div className="flex flex-1 overflow-hidden">
-                {/* Editor Pane */}
-                <div className="w-1/2 flex flex-col border-r border-border/40 relative group">
-                    {/* Floating Formatting Toolbar */}
-                    <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-1 p-1.5 rounded-full bg-foreground/5 backdrop-blur-md border border-white/10 shadow-xl opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-2 group-hover:translate-y-0 z-30">
-                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-background/50" onClick={() => insertText('**', '**')}><Bold size={14} /></Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-background/50" onClick={() => insertText('*', '*')}><Italic size={14} /></Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-background/50" onClick={() => insertText('## ')}><Heading2 size={14} /></Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-background/50" onClick={() => insertText('- ')}><List size={14} /></Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-background/50" onClick={() => insertText('`', '`')}><Code size={14} /></Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-background/50" onClick={() => insertText('[', '](url)')}><LinkIcon size={14} /></Button>
+                <div className="flex-1 flex overflow-hidden">
+                    {/* Editor Pane */}
+                    <div className="w-1/2 flex flex-col border-r border-border/40 relative group">
+                        {/* Floating Formatting Toolbar */}
+                        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-1 p-1.5 rounded-full bg-foreground/5 backdrop-blur-md border border-white/10 shadow-xl opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-2 group-hover:translate-y-0 z-30">
+                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-background/50" onClick={() => insertText('**', '**')}><Bold size={14} /></Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-background/50" onClick={() => insertText('*', '*')}><Italic size={14} /></Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-background/50" onClick={() => insertText('## ')}><Heading2 size={14} /></Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-background/50" onClick={() => insertText('- ')}><List size={14} /></Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-background/50" onClick={() => insertText('`', '`')}><Code size={14} /></Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-background/50" onClick={() => insertText('[', '](url)')}><LinkIcon size={14} /></Button>
+                        </div>
+
+                        <textarea
+                            ref={textareaRef}
+                            onScroll={handleScroll}
+                            value={content}
+                            onChange={(e) => setContent(e.target.value)}
+                            placeholder="Start writing your masterpiece..."
+                            className="flex-1 w-full p-8 resize-none bg-transparent focus:outline-none font-mono text-sm leading-relaxed text-foreground/80 placeholder:text-muted-foreground/30 scroll-smooth selection:bg-indigo-500/20"
+                        />
                     </div>
 
-                    <textarea
-                        ref={textareaRef}
-                        onScroll={handleScroll}
-                        value={content}
-                        onChange={(e) => setContent(e.target.value)}
-                        placeholder="Start writing your masterpiece..."
-                        className="flex-1 w-full p-8 resize-none bg-transparent focus:outline-none font-mono text-sm leading-relaxed text-foreground/80 placeholder:text-muted-foreground/30 scroll-smooth selection:bg-indigo-500/20"
-                    />
+                    {/* Preview Pane */}
+                    <div
+                        ref={previewRef}
+                        className="w-1/2 overflow-auto bg-muted/20 scroll-smooth"
+                    >
+                        <div className="max-w-2xl mx-auto py-12 px-8 
+                prose prose-slate dark:prose-invert 
+                text-foreground/80 dark:text-gray-300
+                dark:prose-headings:text-gray-100">
+                            <ReactMarkdown
+                                remarkPlugins={[remarkGfm]}
+                                components={{
+                                    code(props) {
+                                        const { children, className, node, ref, ...rest } = props
+                                        const match = /language-(\w+)/.exec(className || '')
+                                        return match ? (
+                                            <SyntaxHighlighter
+                                                {...rest}
+                                                PreTag="div"
+                                                children={String(children).replace(/\n$/, '')}
+                                                language={match[1]}
+                                                style={vscDarkPlus}
+                                                customStyle={{ background: 'rgba(0,0,0,0.2)', margin: 0, borderRadius: '0.5rem', padding: '1rem' }}
+                                            />
+                                        ) : (
+                                            <code {...rest} className={className}>
+                                                {children}
+                                            </code>
+                                        )
+                                    }
+                                }}
+                            >
+                                {content}
+                            </ReactMarkdown>
+                        </div>
+                    </div>
                 </div>
 
-                {/* Preview Pane */}
-                <div
-                    ref={previewRef}
-                    className="w-1/2 overflow-auto bg-muted/20 scroll-smooth"
-                >
-                    <div className="max-w-2xl mx-auto py-12 px-8 
-            prose prose-slate dark:prose-invert 
-            text-foreground/80 dark:text-gray-300
-            dark:prose-headings:text-gray-100">
-                        <ReactMarkdown
-                            remarkPlugins={[remarkGfm]}
-                            components={{
-                                code(props) {
-                                    const { children, className, node, ref, ...rest } = props
-                                    const match = /language-(\w+)/.exec(className || '')
-                                    return match ? (
-                                        <SyntaxHighlighter
-                                            {...rest}
-                                            PreTag="div"
-                                            children={String(children).replace(/\n$/, '')}
-                                            language={match[1]}
-                                            style={vscDarkPlus}
-                                            customStyle={{ background: 'rgba(0,0,0,0.2)', margin: 0, borderRadius: '0.5rem', padding: '1rem' }}
-                                        />
-                                    ) : (
-                                        <code {...rest} className={className}>
-                                            {children}
-                                        </code>
-                                    )
-                                }
-                            }}
+                {/* Additional Info Sidebar */}
+                <AnimatePresence>
+                    {showInfoSidebar && (
+                        <motion.div
+                            initial={{ x: '100%' }}
+                            animate={{ x: 0 }}
+                            exit={{ x: '100%' }}
+                            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+                            className="w-80 h-full border-l border-border/40 bg-card/30 backdrop-blur-2xl flex flex-col overflow-hidden"
                         >
-                            {content}
-                        </ReactMarkdown>
-                    </div>
-                </div>
+                            <div className="p-4 border-b border-border/40 flex items-center justify-between">
+                                <h3 className="font-semibold text-sm flex items-center gap-2">
+                                    <LinkIcon size={14} className="text-indigo-500" />
+                                    Additional Info
+                                </h3>
+                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setShowInfoSidebar(false)}>
+                                    <ArrowLeft size={16} className="rotate-180" />
+                                </Button>
+                            </div>
+
+                            <div className="flex-1 overflow-auto p-4 space-y-6">
+                                {/* SEO Section */}
+                                <section className="space-y-3">
+                                    <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">SEO Metadata</h4>
+                                    <div className="space-y-4">
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] text-muted-foreground ml-1">SEO Title</label>
+                                            <input
+                                                type="text"
+                                                value={seoTitle}
+                                                onChange={(e) => setSeoTitle(e.target.value)}
+                                                className="w-full text-xs bg-background/50 border border-white/5 rounded-lg p-2.5 focus:outline-none focus:ring-1 focus:ring-indigo-500/50 text-foreground transition-all"
+                                                placeholder="Enter SEO title..."
+                                            />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] text-muted-foreground ml-1">SEO Description</label>
+                                            <textarea
+                                                value={seoDescription}
+                                                onChange={(e) => setSeoDescription(e.target.value)}
+                                                rows={3}
+                                                className="w-full text-xs bg-background/50 border border-white/5 rounded-lg p-2.5 focus:outline-none focus:ring-1 focus:ring-indigo-500/50 text-foreground transition-all resize-none"
+                                                placeholder="Enter meta description..."
+                                            />
+                                        </div>
+                                    </div>
+                                </section>
+
+                                {/* Social Media Section */}
+                                <section className="space-y-3">
+                                    <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Social Teasers</h4>
+                                    <div className="space-y-4">
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] text-emerald-500/80 ml-1 font-bold">LinkedIn Teaser</label>
+                                            <textarea
+                                                value={linkedinTeaser}
+                                                onChange={(e) => setLinkedinTeaser(e.target.value)}
+                                                rows={4}
+                                                className="w-full text-xs bg-background/50 border border-white/5 rounded-lg p-2.5 focus:outline-none focus:ring-1 focus:ring-emerald-500/50 text-foreground transition-all resize-none italic"
+                                                placeholder="LinkedIn teaser content..."
+                                            />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] text-indigo-500/80 ml-1 font-bold">Xing Summary</label>
+                                            <textarea
+                                                value={xingSummary}
+                                                onChange={(e) => setXingSummary(e.target.value)}
+                                                rows={4}
+                                                className="w-full text-xs bg-background/50 border border-white/5 rounded-lg p-2.5 focus:outline-none focus:ring-1 focus:ring-indigo-500/50 text-foreground transition-all resize-none italic"
+                                                placeholder="Xing summary content..."
+                                            />
+                                        </div>
+                                    </div>
+                                </section>
+
+                                {/* Action Buttons for Sidebar */}
+                                <div className="pt-4 space-y-2">
+                                    <Button
+                                        className="w-full justify-start gap-2 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border-none"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setShowTranscriptModal(true)}
+                                    >
+                                        <Code size={14} />
+                                        View Original Transcript
+                                    </Button>
+                                    <Button
+                                        className="w-full justify-start gap-2"
+                                        size="sm"
+                                        onClick={handleSave}
+                                        disabled={updateMutation.isPending}
+                                    >
+                                        {updateMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                                        Save Changes
+                                    </Button>
+                                </div>
+                            </div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
             </div>
+
+            {/* Transcript Modal */}
+            <AnimatePresence>
+                {showTranscriptModal && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-24">
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            onClick={() => setShowTranscriptModal(false)}
+                            className="absolute inset-0 bg-background/80 backdrop-blur-sm"
+                        />
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                            className="relative w-full max-w-4xl h-full max-h-[80vh] bg-card border border-border/40 rounded-2xl shadow-2xl flex flex-col overflow-hidden"
+                        >
+                            <div className="p-6 border-b border-border/40 flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 rounded-lg bg-indigo-500/10 text-indigo-500">
+                                        <Code size={20} />
+                                    </div>
+                                    <div>
+                                        <h2 className="text-lg font-bold">Original Transcript</h2>
+                                        <p className="text-xs text-muted-foreground">The raw content extracted from the source.</p>
+                                    </div>
+                                </div>
+                                <Button variant="ghost" size="icon" onClick={() => setShowTranscriptModal(false)}>
+                                    <ArrowLeft size={18} className="rotate-180" />
+                                </Button>
+                            </div>
+                            <div className="flex-1 overflow-auto p-8 font-mono text-sm leading-relaxed text-foreground/80 whitespace-pre-wrap selection:bg-indigo-500/20">
+                                {article.rawTranscript}
+                            </div>
+                            <div className="p-6 border-t border-border/40 bg-muted/30 flex justify-end">
+                                <Button onClick={() => setShowTranscriptModal(false)}>Close View</Button>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
         </motion.div>
     );
 };

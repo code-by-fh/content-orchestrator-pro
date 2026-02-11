@@ -33,6 +33,8 @@ model Article {
   linkedinTeaser String?       @db.Text
   xingSummary    String?       @db.Text
   status         ArticleStatus @default(DRAFT)
+  seoTitle       String?
+  seoDescription String?       @db.Text
   scheduledAt    DateTime?
   publishedAt    DateTime?
   createdAt      DateTime      @default(now())

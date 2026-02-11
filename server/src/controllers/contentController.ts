@@ -75,6 +75,10 @@ export const updateArticle = async (req: Request, res: Response) => {
         if (title !== undefined) updateData.title = title;
         if (markdownContent !== undefined) updateData.markdownContent = markdownContent;
         if (status !== undefined) updateData.status = status;
+        if (req.body.seoTitle !== undefined) updateData.seoTitle = req.body.seoTitle;
+        if (req.body.seoDescription !== undefined) updateData.seoDescription = req.body.seoDescription;
+        if (req.body.linkedinTeaser !== undefined) updateData.linkedinTeaser = req.body.linkedinTeaser;
+        if (req.body.xingSummary !== undefined) updateData.xingSummary = req.body.xingSummary;
 
         // Handle scheduled publishing
         if (status === 'SCHEDULED' && scheduledAt) {

@@ -9,6 +9,8 @@ export interface Article {
     markdownContent?: string;
     linkedinTeaser?: string;
     xingSummary?: string;
+    seoTitle?: string;
+    seoDescription?: string;
     status: ArticleStatus;
     scheduledAt?: string;
     publishedAt?: string;
