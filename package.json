@@ -1,0 +1,12 @@
+{
+  "dependencies": {
+    "@prisma/client": "^7.3.0",
+    "bullmq": "^5.67.3",
+    "cors": "^2.8.6",
+    "dotenv": "^17.2.4",
+    "express": "^5.2.1",
+    "helmet": "^8.1.0",
+    "prisma": "^7.3.0",
+    "zod": "^4.3.6"
+  }
+}
