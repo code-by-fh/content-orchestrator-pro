@@ -2,8 +2,9 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getArticles, createArticle, deleteArticle, updateArticle } from '../api';
 import { Link } from 'react-router-dom';
-import { Plus, Youtube, FileText, Loader2, Clock, CheckCircle, AlertCircle, RefreshCw, Trash2, Calendar } from 'lucide-react';
+import { Plus, Youtube, FileText, Loader2, Clock, CheckCircle, AlertCircle, RefreshCw, Trash2, Calendar, Search, Filter } from 'lucide-react';
 import { Button } from './ui/Button';
+import { Input } from './ui/Input';
 import { cn } from '../lib/utils';
 import type { ArticleStatus } from '../types';
 import { toast } from 'sonner';
@@ -25,6 +26,8 @@ export const ArticleList: React.FC = () => {
     const [url, setUrl] = useState('');
     const [confirmDeleteItem, setConfirmDeleteItem] = useState<{ id: string, status: ArticleStatus } | null>(null);
     const [confirmUnpublishItem, setConfirmUnpublishItem] = useState<{ id: string } | null>(null);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [showOnlyPublished, setShowOnlyPublished] = useState(false);
     // Removed manual type selection state since it's now auto-detected
 
     const { data: articles, isLoading } = useQuery({
@@ -71,6 +74,13 @@ export const ArticleList: React.FC = () => {
         onError: () => {
             toast.error("Failed to update article");
         }
+    });
+
+    // Filtering logic
+    const filteredArticles = articles?.filter(article => {
+        const matchesSearch = (article.title || '').toLowerCase().includes(searchQuery.toLowerCase());
+        const matchesPublished = showOnlyPublished ? article.status === 'PUBLISHED' : true;
+        return matchesSearch && matchesPublished;
     });
 
     const handleSubmit = (e: React.FormEvent) => {
@@ -123,11 +133,35 @@ export const ArticleList: React.FC = () => {
                 </div>
             </div>
 
+            {/* Filters and Search */}
+            <div className="flex flex-col sm:flex-row gap-4 items-center">
+                <div className="relative flex-1 w-full">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                    <Input
+                        placeholder="Search by title..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="pl-10 w-full"
+                    />
+                </div>
+                <Button
+                    variant={showOnlyPublished ? "default" : "outline"}
+                    onClick={() => setShowOnlyPublished(!showOnlyPublished)}
+                    className={cn(
+                        "gap-2 shrink-0 w-full sm:w-auto",
+                        showOnlyPublished && "bg-emerald-500/10 text-emerald-500 border-emerald-500/20 hover:bg-emerald-500/20"
+                    )}
+                >
+                    <Filter size={16} />
+                    {showOnlyPublished ? 'All Articles' : 'Published Only'}
+                </Button>
+            </div>
+
             {/* Article List */}
             <div className="space-y-4">
                 <div className="flex items-center justify-between">
                     <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Your Library</h3>
-                    <span className="text-xs text-muted-foreground">{articles?.length || 0} items</span>
+                    <span className="text-xs text-muted-foreground">{filteredArticles?.length || 0} of {articles?.length || 0} items</span>
                 </div>
 
                 {isLoading ? (
@@ -139,7 +173,7 @@ export const ArticleList: React.FC = () => {
                 ) : (
                     <div className="flex flex-col gap-3 w-full">
                         <AnimatePresence mode='popLayout'>
-                            {articles?.map((article, i) => (
+                            {filteredArticles?.map((article, i) => (
                                 <motion.div
                                     key={article.id}
                                     initial={{ opacity: 0, y: 20 }}

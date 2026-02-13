@@ -6,6 +6,7 @@ import { Button } from './ui/Button';
 import { ThemeToggle } from './ui/ThemeToggle';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CommandMenu } from './ui/CommandMenu';
+import logo from '../assets/orchestrator.svg';
 
 const NavItem = ({ to, icon: Icon, label, collapsed, onClick }: { to: string; icon: any; label: string; collapsed: boolean; onClick?: () => void }) => {
     return (
@@ -71,8 +72,6 @@ export const DashboardLayout = () => {
 
     const toggleSidebar = () => setCollapsed(!collapsed);
 
-    const sidebarWidth = collapsed ? (isMobile ? 0 : 68) : 256;
-
     return (
         <div className="flex h-screen w-full bg-background overflow-hidden selection:bg-indigo-500/20">
             <CommandMenu />
@@ -104,8 +103,8 @@ export const DashboardLayout = () => {
             >
                 <div className="h-16 flex items-center justify-between px-4 border-b border-border/50">
                     <div className="flex items-center gap-2 overflow-hidden">
-                        <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-500 flex items-center justify-center shrink-0 shadow-lg shadow-indigo-500/20">
-                            <span className="text-white font-bold">C</span>
+                        <div className="h-8 w-8 rounded-lg  flex items-center justify-center shrink-0 shadow-lg shadow-indigo-500/20">
+                            <img src={logo} alt="Content Orchestrator Pro Logo" />
                         </div>
                         {(!collapsed || isMobile) && (
                             <motion.span
