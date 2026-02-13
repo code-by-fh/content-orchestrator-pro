@@ -30,6 +30,7 @@ import { cn } from '../lib/utils';
 import type { Article } from '../types';
 import { ScheduleModal } from './ScheduleModal';
 import { Panel, Group, Separator } from 'react-resizable-panels';
+import { ConfirmationModal } from './ui/ConfirmationModal';
 
 
 export const ArticleEditor: React.FC = () => {
@@ -38,6 +39,7 @@ export const ArticleEditor: React.FC = () => {
     const queryClient = useQueryClient();
     const [content, setContent] = useState('');
     const [showScheduleModal, setShowScheduleModal] = useState(false);
+    const [showUnpublishConfirm, setShowUnpublishConfirm] = useState(false);
     const [showInfoSidebar, setShowInfoSidebar] = useState(false);
     const [showTranscriptModal, setShowTranscriptModal] = useState(false);
     const [isMobile, setIsMobile] = useState(false);
@@ -136,6 +138,14 @@ export const ArticleEditor: React.FC = () => {
             scheduledAt: isoString,
             ...getMetadataPayload()
         });
+    };
+
+    const handleUnpublish = () => {
+        updateMutation.mutate({
+            status: 'DRAFT',
+            scheduledAt: null as any // Clear scheduled date when unpublishing
+        });
+        setShowUnpublishConfirm(false);
     };
 
     const insertText = (before: string, after: string = '') => {
@@ -252,6 +262,21 @@ export const ArticleEditor: React.FC = () => {
                             <span className="hidden md:inline">Save</span>
                         </Button>
                     </motion.div>
+
+                    {(article.status === 'PUBLISHED' || article.status === 'SCHEDULED') && (
+                        <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="shrink-0">
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setShowUnpublishConfirm(true)}
+                                disabled={updateMutation.isPending}
+                                className="gap-2 px-2 md:px-4 text-amber-500 hover:text-amber-600 hover:bg-amber-500/10"
+                            >
+                                <X size={16} />
+                                <span className="hidden md:inline">Unpublish</span>
+                            </Button>
+                        </motion.div>
+                    )}
 
                     <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="shrink-0">
                         <Button
@@ -478,6 +503,17 @@ export const ArticleEditor: React.FC = () => {
                     </div>
                 )}
             </AnimatePresence>
+
+            <ConfirmationModal
+                isOpen={showUnpublishConfirm}
+                onClose={() => setShowUnpublishConfirm(false)}
+                onConfirm={handleUnpublish}
+                title="Unpublish Article"
+                description="Are you sure you want to unpublish this article? It will be moved back to drafts and any scheduled publication will be cancelled."
+                confirmLabel="Unpublish"
+                variant="warning"
+                isLoading={updateMutation.isPending}
+            />
         </motion.div>
     );
 };

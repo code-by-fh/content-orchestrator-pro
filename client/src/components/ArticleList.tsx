@@ -8,6 +8,7 @@ import { cn } from '../lib/utils';
 import type { ArticleStatus } from '../types';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
+import { ConfirmationModal } from './ui/ConfirmationModal';
 
 const StatusIndicator = ({ status }: { status: ArticleStatus }) => {
     switch (status) {
@@ -22,6 +23,8 @@ const StatusIndicator = ({ status }: { status: ArticleStatus }) => {
 export const ArticleList: React.FC = () => {
     const queryClient = useQueryClient();
     const [url, setUrl] = useState('');
+    const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+    const [confirmUnpublishItem, setConfirmUnpublishItem] = useState<{ id: string } | null>(null);
     // Removed manual type selection state since it's now auto-detected
 
     const { data: articles, isLoading } = useQuery({
@@ -56,6 +59,17 @@ export const ArticleList: React.FC = () => {
         },
         onError: () => {
             toast.error("Failed to delete article");
+        }
+    });
+
+    const updateMutation = useMutation({
+        mutationFn: (variables: { id: string, status: ArticleStatus }) => updateArticle(variables.id, { status: variables.status }),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['articles'] });
+            toast.success("Article updated successfully");
+        },
+        onError: () => {
+            toast.error("Failed to update article");
         }
     });
 
@@ -170,7 +184,9 @@ export const ArticleList: React.FC = () => {
                                                     </span>
                                                     <ArticleActions
                                                         article={article}
-                                                        onDelete={(id) => deleteMutation.mutate(id)}
+                                                        onDelete={(id) => setConfirmDeleteId(id)}
+                                                        onUnpublish={(id) => setConfirmUnpublishItem({ id })}
+                                                        isUnpublishing={updateMutation.isPending && updateMutation.variables?.id === article.id}
                                                     />
                                                 </div>
                                             </div>
@@ -191,22 +207,44 @@ export const ArticleList: React.FC = () => {
                     </div>
                 )}
             </div>
+
+            {/* Modals */}
+            <ConfirmationModal
+                isOpen={!!confirmDeleteId}
+                onClose={() => setConfirmDeleteId(null)}
+                onConfirm={() => {
+                    if (confirmDeleteId) {
+                        deleteMutation.mutate(confirmDeleteId);
+                        setConfirmDeleteId(null);
+                    }
+                }}
+                title="Delete Article"
+                description="Are you sure you want to delete this article? This action cannot be undone."
+                confirmLabel="Delete"
+                variant="danger"
+                isLoading={deleteMutation.isPending}
+            />
+
+            <ConfirmationModal
+                isOpen={!!confirmUnpublishItem}
+                onClose={() => setConfirmUnpublishItem(null)}
+                onConfirm={() => {
+                    if (confirmUnpublishItem) {
+                        updateMutation.mutate({ id: confirmUnpublishItem.id, status: 'DRAFT' });
+                        setConfirmUnpublishItem(null);
+                    }
+                }}
+                title="Unpublish Article"
+                description="Unpublish this article? It will be reverted to a draft."
+                confirmLabel="Unpublish"
+                variant="warning"
+                isLoading={updateMutation.isPending}
+            />
         </div>
     );
 };
 
-const ArticleActions = ({ article, onDelete }: { article: any, onDelete: (id: string) => void }) => {
-    const queryClient = useQueryClient();
-    const updateMutation = useMutation({
-        mutationFn: (variables: { id: string, status: ArticleStatus }) => updateArticle(variables.id, { status: variables.status }),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['articles'] });
-            toast.success("Article unpublished successfully");
-        },
-        onError: () => {
-            toast.error("Failed to unpublish article");
-        }
-    });
+const ArticleActions = ({ article, onDelete, onUnpublish, isUnpublishing }: { article: any, onDelete: (id: string) => void, onUnpublish: (id: string) => void, isUnpublishing: boolean }) => {
 
     return (
         <div className="flex items-center gap-1">
@@ -214,18 +252,15 @@ const ArticleActions = ({ article, onDelete }: { article: any, onDelete: (id: st
                 <Button
                     variant="ghost"
                     size="icon"
-                    className="h-8 w-8 text-muted-foreground hover:text-amber-500 hover:bg-amber-500/10 z-10 relative" // added relative/z-10 to ensure clickable
+                    className="h-8 w-8 text-muted-foreground hover:text-amber-500 hover:bg-amber-500/10 z-10 relative"
                     title="Unpublish"
-                    disabled={updateMutation.isPending}
                     onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
-                        if (confirm('Unpublish this article? output will be reverted to draft.')) {
-                            updateMutation.mutate({ id: article.id, status: 'DRAFT' });
-                        }
+                        onUnpublish(article.id);
                     }}
                 >
-                    {updateMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : <Loader2 size={16} className="rotate-180" />}
+                    {isUnpublishing ? <Loader2 size={16} className="animate-spin" /> : <Loader2 size={16} className="rotate-180" />}
                 </Button>
             )}
             <Button
@@ -235,9 +270,7 @@ const ArticleActions = ({ article, onDelete }: { article: any, onDelete: (id: st
                 onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    if (confirm('Are you sure you want to delete this article?')) {
-                        onDelete(article.id);
-                    }
+                    onDelete(article.id);
                 }}
             >
                 <Trash2 size={16} />
