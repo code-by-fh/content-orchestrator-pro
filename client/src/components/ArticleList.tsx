@@ -23,7 +23,7 @@ const StatusIndicator = ({ status }: { status: ArticleStatus }) => {
 export const ArticleList: React.FC = () => {
     const queryClient = useQueryClient();
     const [url, setUrl] = useState('');
-    const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+    const [confirmDeleteItem, setConfirmDeleteItem] = useState<{ id: string, status: ArticleStatus } | null>(null);
     const [confirmUnpublishItem, setConfirmUnpublishItem] = useState<{ id: string } | null>(null);
     // Removed manual type selection state since it's now auto-detected
 
@@ -184,7 +184,7 @@ export const ArticleList: React.FC = () => {
                                                     </span>
                                                     <ArticleActions
                                                         article={article}
-                                                        onDelete={(id) => setConfirmDeleteId(id)}
+                                                        onDelete={() => setConfirmDeleteItem({ id: article.id, status: article.status })}
                                                         onUnpublish={(id) => setConfirmUnpublishItem({ id })}
                                                         isUnpublishing={updateMutation.isPending && updateMutation.variables?.id === article.id}
                                                     />
@@ -210,16 +210,20 @@ export const ArticleList: React.FC = () => {
 
             {/* Modals */}
             <ConfirmationModal
-                isOpen={!!confirmDeleteId}
-                onClose={() => setConfirmDeleteId(null)}
+                isOpen={!!confirmDeleteItem}
+                onClose={() => setConfirmDeleteItem(null)}
                 onConfirm={() => {
-                    if (confirmDeleteId) {
-                        deleteMutation.mutate(confirmDeleteId);
-                        setConfirmDeleteId(null);
+                    if (confirmDeleteItem) {
+                        deleteMutation.mutate(confirmDeleteItem.id);
+                        setConfirmDeleteItem(null);
                     }
                 }}
                 title="Delete Article"
-                description="Are you sure you want to delete this article? This action cannot be undone."
+                description={
+                    confirmDeleteItem?.status === 'PUBLISHED' || confirmDeleteItem?.status === 'SCHEDULED'
+                        ? "This article is currently live or scheduled. Deleting it will also UNPUBLISH it from all platforms. Are you sure?"
+                        : "Are you sure you want to delete this article? This action cannot be undone."
+                }
                 confirmLabel="Delete"
                 variant="danger"
                 isLoading={deleteMutation.isPending}
@@ -244,7 +248,7 @@ export const ArticleList: React.FC = () => {
     );
 };
 
-const ArticleActions = ({ article, onDelete, onUnpublish, isUnpublishing }: { article: any, onDelete: (id: string) => void, onUnpublish: (id: string) => void, isUnpublishing: boolean }) => {
+const ArticleActions = ({ article, onDelete, onUnpublish, isUnpublishing }: { article: any, onDelete: () => void, onUnpublish: (id: string) => void, isUnpublishing: boolean }) => {
 
     return (
         <div className="flex items-center gap-1">
@@ -270,7 +274,7 @@ const ArticleActions = ({ article, onDelete, onUnpublish, isUnpublishing }: { ar
                 onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    onDelete(article.id);
+                    onDelete();
                 }}
             >
                 <Trash2 size={16} />

@@ -54,9 +54,18 @@ export const getArticle = async (req: Request, res: Response) => {
     res.json(article);
 };
 
+import { deleteFromLinkedIn } from '../services/linkedin';
+
 export const deleteArticle = async (req: Request, res: Response) => {
     const { id } = req.params;
     try {
+        const article = await prisma.article.findUnique({ where: { id: id as string } });
+
+        if (article && (article.status === 'PUBLISHED' || article.status === 'SCHEDULED')) {
+            console.log(`[Content] Article ${id} is ${article.status}. Unpublishing before deletion...`);
+            await deleteFromLinkedIn(article);
+        }
+
         await prisma.article.delete({ where: { id: id as string } });
         res.status(204).send();
     } catch (error) {

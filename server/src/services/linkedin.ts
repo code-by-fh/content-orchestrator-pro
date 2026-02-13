@@ -35,3 +35,9 @@ export const postToLinkedIn = async (article: Article) => {
 
     return true;
 };
+
+export const deleteFromLinkedIn = async (article: Article) => {
+    console.log(`[LinkedIn] Unpublishing/Deleting article: ${article.title}`);
+    // Logic to delete the post via LinkedIn API (e.g., DELETE /ugcPosts/{postId})
+    return true;
+};
