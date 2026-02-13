@@ -80,28 +80,28 @@ export const ArticleList: React.FC = () => {
     };
 
     return (
-        <div className="p-8 max-w-7xl mx-auto space-y-12">
+        <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-8 md:space-y-12">
             {/* Minimalist Header */}
             <div className="space-y-2">
-                <h1 className="text-4xl font-bold tracking-tight glow-text">Content Studio</h1>
-                <p className="text-muted-foreground text-lg">Create, manage, and publish your content.</p>
+                <h1 className="text-3xl md:text-4xl font-bold tracking-tight glow-text">Content Studio</h1>
+                <p className="text-muted-foreground text-sm md:text-lg">Create, manage, and publish your content.</p>
             </div>
 
             {/* Input Area */}
             <div className="relative group w-full">
                 <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/10 to-purple-600/10 rounded-xl blur-xl opacity-0 group-hover:opacity-100 transition duration-500"></div>
-                <div className="relative flex items-center bg-card/50 backdrop-blur-xl rounded-xl p-2 border border-white/10 shadow-2xl">
+                <div className="relative flex flex-col md:flex-row items-stretch md:items-center gap-2 bg-card/50 backdrop-blur-xl rounded-xl p-2 border border-white/10 shadow-2xl">
                     <input
                         type="text"
                         placeholder="Paste YouTube or Medium URL here..."
                         value={url}
                         onChange={(e) => setUrl(e.target.value)}
-                        className="flex-1 bg-transparent border-none px-4 py-3 text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-0"
+                        className="flex-1 bg-transparent border-none px-4 py-3 text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-0 min-w-0"
                     />
                     <Button
                         onClick={handleSubmit}
                         disabled={createMutation.isPending || !url}
-                        className="rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground px-6 shadow-lg shadow-indigo-500/20 transition-all"
+                        className="rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground px-6 py-3 md:py-2 shadow-lg shadow-indigo-500/20 transition-all w-full md:w-auto justify-center"
                     >
                         {createMutation.isPending ? <Loader2 className="animate-spin" /> : <Plus />}
                         <span className="ml-2">Generate</span>
@@ -139,15 +139,15 @@ export const ArticleList: React.FC = () => {
                                         className="group block w-full relative"
                                     >
                                         <div className="absolute -inset-px bg-gradient-to-r from-indigo-500/0 to-purple-500/0 group-hover:from-indigo-500/10 group-hover:to-purple-500/10 rounded-xl transition-all duration-500" />
-                                        <div className="relative flex items-center justify-between p-5 bg-card/40 border border-white/5 hover:border-white/10 rounded-xl backdrop-blur-sm transition-all hover:translate-x-1 w-full overflow-hidden">
-                                            <div className="flex items-center gap-4 overflow-hidden flex-1 min-w-0">
+                                        <div className="relative flex flex-col md:flex-row items-start md:items-center justify-between p-4 md:p-5 bg-card/40 border border-white/5 hover:border-white/10 rounded-xl backdrop-blur-sm transition-all hover:translate-x-0 md:hover:translate-x-1 w-full overflow-hidden">
+                                            <div className="flex items-center gap-4 overflow-hidden flex-1 min-w-0 w-full">
                                                 <div className={cn(
                                                     "h-10 w-10 rounded-full flex items-center justify-center shrink-0",
                                                     article.sourceUrl?.includes('youtu') ? "bg-red-500/10 text-red-500" : "bg-white/10 text-foreground"
                                                 )}>
                                                     {article.sourceUrl?.includes('youtu') ? <Youtube size={18} /> : <FileText size={18} />}
                                                 </div>
-                                                <div className="min-w-0">
+                                                <div className="min-w-0 flex-1">
                                                     <h4 className="font-semibold text-foreground truncate group-hover:text-indigo-400 transition-colors">{article.title || 'Untitled Article'}</h4>
                                                     <p className="text-xs text-muted-foreground truncate">{article.slug || 'Processing...'}</p>
                                                     {article.status === 'SCHEDULED' && article.scheduledAt && (
@@ -159,18 +159,20 @@ export const ArticleList: React.FC = () => {
                                                 </div>
                                             </div>
 
-                                            <div className="flex items-center gap-6 shrink-0 pl-4">
+                                            <div className="flex items-center justify-between w-full md:w-auto md:justify-end gap-4 pl-0 md:pl-4 mt-4 md:mt-0 border-t md:border-t-0 border-white/5 pt-4 md:pt-0 shrink-0">
                                                 <div className="flex items-center gap-2 text-xs font-medium bg-secondary/50 px-2.5 py-1 rounded-full border border-white/5">
                                                     <StatusIndicator status={article.status} />
                                                     <span className="capitalize">{article.status.toLowerCase()}</span>
                                                 </div>
-                                                <span className="text-xs text-muted-foreground w-20 text-right">
-                                                    {new Date(article.createdAt).toLocaleDateString()}
-                                                </span>
-                                                <ArticleActions
-                                                    article={article}
-                                                    onDelete={(id) => deleteMutation.mutate(id)}
-                                                />
+                                                <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                                                    <span className="hidden sm:inline">
+                                                        {new Date(article.createdAt).toLocaleDateString()}
+                                                    </span>
+                                                    <ArticleActions
+                                                        article={article}
+                                                        onDelete={(id) => deleteMutation.mutate(id)}
+                                                    />
+                                                </div>
                                             </div>
                                         </div>
                                     </Link>

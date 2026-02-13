@@ -51,17 +51,15 @@ async function generateArticleContent(rawText: string): Promise<ValidatedArticle
             Aufgabe:
             Erstelle einen SEO-optimierten Fachartikel im Markdown-Format aus dem bereitgestellten Transkript.
 
-            WICHTG: Analysiere zuerst IMMER den Schreibstil dieses Artikels und schreibe dann einen neuen Artikel über das gleiche Thema, aber in einem völlig anderen Stil.
-            
             Anforderungen:
             - Zielgruppe: Fachpublikum (Entwickler, Data Scientists, Tech-affine Leser)
-            - Tonalität: Professionell, sachlich, leicht locker (kein steifes Deutsch)
+            - Tonalität: Professionell, sachlich, locker (kein steifes Deutsch)
             - Struktur: H1 (Titel), H2 (Kapitel), H3 (Unterkapitel), Bullet Points, Code-Beispiele
             - SEO: Relevante Keywords natürlich einbauen, keine Keyword-Stuffing
             - Formatierung: Markdown (keine HTML-Tags)
-            - Länge: ca. 1000-1500 Wörter
+            - Länge: mindestens so viele Wörter wie im Transkript vorhanden sind
             
-            Zusätzliche Outputs:
+            Zusätzliche Outputs (halte dich dabei IMMER an die beschriebene Tonalität und Zielgruppe und gebe diese IMMER in der JSON zurück):
             - LinkedIn Teaser: Kurzer, knackiger Text (ca. 2-3 Sätze) für LinkedIn
             - Xing Summary: Etwas längere Zusammenfassung für Xing
             - SEO Title: Optimierter Titel für Suchmaschinen

@@ -6,13 +6,31 @@ import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { getArticle, updateArticle } from '../api';
-import { Loader2, Link as LinkIcon, Bold, Italic, List, Heading2, Code, ArrowLeft, Save, UploadCloud, Calendar } from 'lucide-react';
+import {
+    Loader2,
+    Link as LinkIcon,
+    Bold,
+    Italic,
+    List,
+    Heading2,
+    Code,
+    ArrowLeft,
+    Save,
+    UploadCloud,
+    Calendar,
+    Columns,
+    Rows,
+    Repeat,
+    X
+} from 'lucide-react';
 import { Button } from './ui/Button';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '../lib/utils';
-import type { Article, ArticleStatus } from '../types';
+import type { Article } from '../types';
 import { ScheduleModal } from './ScheduleModal';
+import { Panel, Group, Separator } from 'react-resizable-panels';
+
 
 export const ArticleEditor: React.FC = () => {
     const { id } = useParams<{ id: string }>();
@@ -22,12 +40,18 @@ export const ArticleEditor: React.FC = () => {
     const [showScheduleModal, setShowScheduleModal] = useState(false);
     const [showInfoSidebar, setShowInfoSidebar] = useState(false);
     const [showTranscriptModal, setShowTranscriptModal] = useState(false);
+    const [isMobile, setIsMobile] = useState(false);
 
     // Editable Metadata State
     const [seoTitle, setSeoTitle] = useState('');
     const [seoDescription, setSeoDescription] = useState('');
     const [linkedinTeaser, setLinkedinTeaser] = useState('');
     const [xingSummary, setXingSummary] = useState('');
+
+    // Panel Layout State
+    const [isSwapped, setIsSwapped] = useState(false);
+    const [orientation, setOrientation] = useState<'horizontal' | 'vertical'>('horizontal');
+    const panelGroupRef = useRef<any>(null);
 
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const previewRef = useRef<HTMLDivElement>(null);
@@ -37,6 +61,21 @@ export const ArticleEditor: React.FC = () => {
         queryFn: () => getArticle(id!),
         enabled: !!id,
     });
+
+    useEffect(() => {
+        const checkMobile = () => {
+            const mobile = window.innerWidth < 768;
+            setIsMobile(mobile);
+            if (mobile) {
+                setOrientation('vertical');
+            } else {
+                setOrientation('horizontal');
+            }
+        };
+        checkMobile();
+        window.addEventListener('resize', checkMobile);
+        return () => window.removeEventListener('resize', checkMobile);
+    }, []);
 
     useEffect(() => {
         if (article) {
@@ -135,102 +174,94 @@ export const ArticleEditor: React.FC = () => {
             animate={{ opacity: 1 }}
             className="flex flex-col h-full bg-background transition-all duration-500 overflow-hidden"
         >
-            {/* Minimalist Floating Toolbar */}
-            <header className="h-16 flex items-center justify-between px-6 border-b border-border/40 backdrop-blur-xl bg-background/80 sticky top-0 z-40">
-                <div className="flex items-center gap-4">
-                    <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="hover:bg-muted text-muted-foreground">
+            {/* Responsive Toolbar */}
+            <header className="h-16 md:h-16 flex items-center justify-between px-4 md:px-6 border-b border-border/40 backdrop-blur-xl bg-background/80 sticky top-0 z-40">
+                <div className="flex items-center gap-3 md:gap-4 overflow-hidden">
+                    <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="hover:bg-muted text-muted-foreground shrink-0">
                         <ArrowLeft size={18} />
                     </Button>
-                    <div className="min-w-0">
-                        <h1 className="text-sm font-semibold text-foreground truncate max-w-[150px] sm:max-w-md">{article.title}</h1>
+                    <div className="min-w-0 flex-1">
+                        <h1 className="text-sm font-semibold text-foreground truncate max-w-[120px] md:max-w-md">{article.title}</h1>
                         <div className="flex items-center gap-2">
-                            <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+                            <p className="text-[10px] text-muted-foreground flex items-center gap-1 whitespace-nowrap">
                                 <span className={cn("w-1.5 h-1.5 rounded-full", article.status === 'PUBLISHED' ? "bg-emerald-500" : article.status === 'SCHEDULED' ? "bg-blue-500" : "bg-amber-500")}></span>
                                 {article.status}
                             </p>
                             {article.status === 'SCHEDULED' && article.scheduledAt && (
                                 <button
                                     onClick={() => setShowScheduleModal(true)}
-                                    className="text-[10px] text-blue-400 hover:text-blue-300 flex items-center gap-1 hover:underline cursor-pointer"
+                                    className="text-[10px] text-blue-400 hover:text-blue-300 flex items-center gap-1 hover:underline cursor-pointer whitespace-nowrap"
                                 >
                                     <Calendar size={10} />
-                                    {new Date(article.scheduledAt).toLocaleString()}
+                                    <span className="hidden sm:inline">{new Date(article.scheduledAt).toLocaleString()}</span>
+                                    <span className="sm:hidden">{new Date(article.scheduledAt).toLocaleDateString()}</span>
                                 </button>
-                            )}
-                            {article.sourceUrl && (
-                                <a
-                                    href={article.sourceUrl}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-[10px] text-indigo-400 hover:text-indigo-300 flex items-center gap-1 hover:underline truncate max-w-[200px]"
-                                >
-                                    <LinkIcon size={10} />
-                                    Source
-                                </a>
                             )}
                         </div>
                     </div>
                 </div>
 
-                <div className="flex items-center gap-3">
-                    <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                <div className="flex items-center gap-2 md:gap-3 overflow-x-auto no-scrollbar pl-2">
+                    {/* Layout Controls - Hidden on strict mobile, visible on desktop/tablet */}
+                    <div className="hidden md:flex items-center gap-1 bg-muted/30 rounded-lg p-1 mr-2 border border-border/40">
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            onClick={() => setIsSwapped(!isSwapped)}
+                            title="Swap Editor/Preview"
+                        >
+                            <Repeat size={14} className={cn("transition-transform duration-500", isSwapped && "rotate-180")} />
+                        </Button>
+                        <div className="w-px h-4 bg-border/40" />
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className={cn("h-7 w-7", orientation === 'horizontal' && "bg-background/80 shadow-sm")}
+                            onClick={() => setOrientation('horizontal')}
+                            title="Side-by-Side"
+                        >
+                            <Columns size={14} />
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className={cn("h-7 w-7", orientation === 'vertical' && "bg-background/80 shadow-sm")}
+                            onClick={() => setOrientation('vertical')}
+                            title="Stacked"
+                        >
+                            <Rows size={14} />
+                        </Button>
+                    </div>
+
+                    <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="shrink-0">
                         <Button
                             variant="ghost"
                             size="sm"
                             onClick={() => setShowInfoSidebar(!showInfoSidebar)}
-                            className={cn("gap-2", showInfoSidebar && "bg-indigo-500/10 text-indigo-500")}
+                            className={cn("gap-2 px-2 md:px-4", showInfoSidebar && "bg-indigo-500/10 text-indigo-500")}
                         >
                             <LinkIcon size={16} />
-                            Info
+                            <span className="hidden md:inline">Info</span>
                         </Button>
                     </motion.div>
 
-                    {(article.status === 'PUBLISHED' || article.status === 'SCHEDULED') && (
-                        <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => updateMutation.mutate({ status: 'DRAFT', scheduledAt: '' })} // reverted to DRAFT or similar state
-                                disabled={updateMutation.isPending}
-                                className="text-amber-500 border-amber-500/20 hover:bg-amber-500/10 gap-2"
-                            >
-                                {updateMutation.isPending ? <Loader2 className="animate-spin w-4 h-4" /> : <Loader2 size={16} className="rotate-180" />}
-                                {article.status === 'SCHEDULED' ? 'Cancel' : 'Unpublish'}
-                            </Button>
-                        </motion.div>
-                    )}
-
-                    <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                        <Button variant="ghost" size="sm" onClick={handleSave} disabled={updateMutation.isPending} className="gap-2">
+                    <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="shrink-0">
+                        <Button variant="ghost" size="sm" onClick={handleSave} disabled={updateMutation.isPending} className="gap-2 px-2 md:px-4">
                             <Save size={16} />
-                            Save
+                            <span className="hidden md:inline">Save</span>
                         </Button>
                     </motion.div>
 
-                    {article.status !== 'PUBLISHED' && (
-                        <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => setShowScheduleModal(true)}
-                                disabled={updateMutation.isPending}
-                                className="border-blue-500/20 text-blue-500 hover:bg-blue-500/10 gap-2"
-                            >
-                                <Calendar size={16} />
-                                {article.status === 'SCHEDULED' ? 'Reschedule' : 'Schedule'}
-                            </Button>
-                        </motion.div>
-                    )}
-
-                    <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                    <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="shrink-0">
                         <Button
                             size="sm"
                             onClick={handlePublish}
                             disabled={updateMutation.isPending}
-                            className="bg-primary text-primary-foreground shadow-lg shadow-indigo-500/20 hover:bg-primary/90 gap-2"
+                            className="bg-primary text-primary-foreground shadow-lg shadow-indigo-500/20 hover:bg-primary/90 gap-2 px-3 md:px-4"
                         >
                             {updateMutation.isPending ? <Loader2 className="animate-spin w-4 h-4" /> : <UploadCloud size={16} />}
-                            {article.status === 'PUBLISHED' ? 'Update' : 'Publish Now'}
+                            <span className="hidden md:inline">{article.status === 'PUBLISHED' ? 'Update' : 'Publish'}</span>
                         </Button>
                     </motion.div>
                 </div>
@@ -244,168 +275,165 @@ export const ArticleEditor: React.FC = () => {
             </header>
 
             {/* Editor Workspace */}
-            <div className="flex flex-1 overflow-hidden">
-                <div className="flex-1 flex overflow-hidden">
-                    {/* Editor Pane */}
-                    <div className="w-1/2 flex flex-col border-r border-border/40 relative group">
-                        {/* Floating Formatting Toolbar */}
-                        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-1 p-1.5 rounded-full bg-foreground/5 backdrop-blur-md border border-white/10 shadow-xl opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-2 group-hover:translate-y-0 z-30">
-                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-background/50" onClick={() => insertText('**', '**')}><Bold size={14} /></Button>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-background/50" onClick={() => insertText('*', '*')}><Italic size={14} /></Button>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-background/50" onClick={() => insertText('## ')}><Heading2 size={14} /></Button>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-background/50" onClick={() => insertText('- ')}><List size={14} /></Button>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-background/50" onClick={() => insertText('`', '`')}><Code size={14} /></Button>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-background/50" onClick={() => insertText('[', '](url)')}><LinkIcon size={14} /></Button>
-                        </div>
-
-                        <textarea
-                            ref={textareaRef}
-                            onScroll={handleScroll}
-                            value={content}
-                            onChange={(e) => setContent(e.target.value)}
-                            placeholder="Start writing your masterpiece..."
-                            className="flex-1 w-full p-8 resize-none bg-transparent focus:outline-none font-mono text-sm leading-relaxed text-foreground/80 placeholder:text-muted-foreground/30 scroll-smooth selection:bg-indigo-500/20"
-                        />
-                    </div>
-
-                    {/* Preview Pane */}
-                    <div
-                        ref={previewRef}
-                        className="w-1/2 overflow-auto bg-muted/20 scroll-smooth"
-                    >
-                        <div className="max-w-2xl mx-auto py-12 px-8 
-                prose prose-slate dark:prose-invert 
-                text-foreground/80 dark:text-gray-300
-                dark:prose-headings:text-gray-100">
-                            <ReactMarkdown
-                                remarkPlugins={[remarkGfm]}
-                                components={{
-                                    code(props) {
-                                        const { children, className, node, ref, ...rest } = props
-                                        const match = /language-(\w+)/.exec(className || '')
-                                        return match ? (
-                                            <SyntaxHighlighter
-                                                {...rest}
-                                                PreTag="div"
-                                                children={String(children).replace(/\n$/, '')}
-                                                language={match[1]}
-                                                style={vscDarkPlus}
-                                                customStyle={{ background: 'rgba(0,0,0,0.2)', margin: 0, borderRadius: '0.5rem', padding: '1rem' }}
-                                            />
-                                        ) : (
-                                            <code {...rest} className={className}>
-                                                {children}
-                                            </code>
-                                        )
-                                    }
-                                }}
-                            >
-                                {content}
-                            </ReactMarkdown>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Additional Info Sidebar */}
-                <AnimatePresence>
-                    {showInfoSidebar && (
-                        <motion.div
-                            initial={{ x: '100%' }}
-                            animate={{ x: 0 }}
-                            exit={{ x: '100%' }}
-                            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                            className="w-80 h-full border-l border-border/40 bg-card/30 backdrop-blur-2xl flex flex-col overflow-hidden"
+            <div className="flex flex-1 overflow-hidden relative">
+                <Group orientation="horizontal" className="flex-1">
+                    {/* Main Content Area */}
+                    <Panel defaultSize={showInfoSidebar && !isMobile ? 67 : 100} minSize={30}>
+                        <Group
+                            groupRef={panelGroupRef}
+                            orientation={orientation}
+                            className="h-full"
                         >
-                            <div className="p-4 border-b border-border/40 flex items-center justify-between">
-                                <h3 className="font-semibold text-sm flex items-center gap-2">
-                                    <LinkIcon size={14} className="text-indigo-500" />
-                                    Additional Info
-                                </h3>
-                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setShowInfoSidebar(false)}>
-                                    <ArrowLeft size={16} className="rotate-180" />
-                                </Button>
-                            </div>
+                            {(() => {
+                                const EditorPanel = (
+                                    <Panel defaultSize={50} minSize={20} className="flex flex-col relative group">
+                                        {/* Floating Formatting Toolbar - Repositioned for mobile */}
+                                        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-1 p-1.5 rounded-full bg-foreground/5 backdrop-blur-md border border-white/10 shadow-xl opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-2 group-hover:translate-y-0 z-30 max-w-[90%] overflow-x-auto no-scrollbar">
+                                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-background/50 shrink-0" onClick={() => insertText('**', '**')}><Bold size={14} /></Button>
+                                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-background/50 shrink-0" onClick={() => insertText('*', '*')}><Italic size={14} /></Button>
+                                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-background/50 shrink-0" onClick={() => insertText('## ')}><Heading2 size={14} /></Button>
+                                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-background/50 shrink-0" onClick={() => insertText('- ')}><List size={14} /></Button>
+                                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-background/50 shrink-0" onClick={() => insertText('`', '`')}><Code size={14} /></Button>
+                                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-background/50 shrink-0" onClick={() => insertText('[', '](url)')}><LinkIcon size={14} /></Button>
+                                        </div>
 
-                            <div className="flex-1 overflow-auto p-4 space-y-6">
-                                {/* SEO Section */}
-                                <section className="space-y-3">
-                                    <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">SEO Metadata</h4>
-                                    <div className="space-y-4">
-                                        <div className="space-y-1">
-                                            <label className="text-[10px] text-muted-foreground ml-1">SEO Title</label>
-                                            <input
-                                                type="text"
-                                                value={seoTitle}
-                                                onChange={(e) => setSeoTitle(e.target.value)}
-                                                className="w-full text-xs bg-background/50 border border-white/5 rounded-lg p-2.5 focus:outline-none focus:ring-1 focus:ring-indigo-500/50 text-foreground transition-all"
-                                                placeholder="Enter SEO title..."
-                                            />
-                                        </div>
-                                        <div className="space-y-1">
-                                            <label className="text-[10px] text-muted-foreground ml-1">SEO Description</label>
+                                        <div className="flex-1 flex flex-col relative bg-background">
+                                            <div className="absolute top-4 left-4 z-10 px-2 py-1 rounded bg-muted/50 text-[9px] uppercase tracking-widest font-bold text-muted-foreground pointer-events-none">
+                                                Editor
+                                            </div>
                                             <textarea
-                                                value={seoDescription}
-                                                onChange={(e) => setSeoDescription(e.target.value)}
-                                                rows={3}
-                                                className="w-full text-xs bg-background/50 border border-white/5 rounded-lg p-2.5 focus:outline-none focus:ring-1 focus:ring-indigo-500/50 text-foreground transition-all resize-none"
-                                                placeholder="Enter meta description..."
+                                                ref={textareaRef}
+                                                onScroll={handleScroll}
+                                                value={content}
+                                                onChange={(e) => setContent(e.target.value)}
+                                                placeholder="Start writing your masterpiece..."
+                                                className="flex-1 w-full p-4 md:p-8 resize-none bg-transparent focus:outline-none font-mono text-sm leading-relaxed text-foreground/80 placeholder:text-muted-foreground/30 scroll-smooth selection:bg-indigo-500/20"
                                             />
                                         </div>
-                                    </div>
-                                </section>
+                                    </Panel>
+                                );
 
-                                {/* Social Media Section */}
-                                <section className="space-y-3">
-                                    <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Social Teasers</h4>
-                                    <div className="space-y-4">
-                                        <div className="space-y-1">
-                                            <label className="text-[10px] text-emerald-500/80 ml-1 font-bold">LinkedIn Teaser</label>
-                                            <textarea
-                                                value={linkedinTeaser}
-                                                onChange={(e) => setLinkedinTeaser(e.target.value)}
-                                                rows={4}
-                                                className="w-full text-xs bg-background/50 border border-white/5 rounded-lg p-2.5 focus:outline-none focus:ring-1 focus:ring-emerald-500/50 text-foreground transition-all resize-none italic"
-                                                placeholder="LinkedIn teaser content..."
-                                            />
+                                const PreviewPanel = (
+                                    <Panel defaultSize={50} minSize={20} className="overflow-hidden bg-muted/20 relative border-l md:border-l-0 md:border-t border-border/40">
+                                        <div className="absolute top-4 right-4 z-10 px-2 py-1 rounded bg-muted/50 text-[9px] uppercase tracking-widest font-bold text-muted-foreground pointer-events-none">
+                                            Preview
                                         </div>
-                                        <div className="space-y-1">
-                                            <label className="text-[10px] text-indigo-500/80 ml-1 font-bold">Xing Summary</label>
-                                            <textarea
-                                                value={xingSummary}
-                                                onChange={(e) => setXingSummary(e.target.value)}
-                                                rows={4}
-                                                className="w-full text-xs bg-background/50 border border-white/5 rounded-lg p-2.5 focus:outline-none focus:ring-1 focus:ring-indigo-500/50 text-foreground transition-all resize-none italic"
-                                                placeholder="Xing summary content..."
-                                            />
+                                        <div
+                                            ref={previewRef}
+                                            className="h-full overflow-auto scroll-smooth"
+                                        >
+                                            <div className="max-w-2xl mx-auto py-8 md:py-12 px-4 md:px-8
+                                                prose prose-slate dark:prose-invert
+                                                text-foreground/80 dark:text-gray-300
+                                                dark:prose-headings:text-gray-100
+                                                prose-sm md:prose-base">
+                                                <ReactMarkdown
+                                                    remarkPlugins={[remarkGfm]}
+                                                    components={{
+                                                        code(props) {
+                                                            const { children, className, node, ref, ...rest } = props
+                                                            const match = /language-(\w+)/.exec(className || '')
+                                                            return match ? (
+                                                                <SyntaxHighlighter
+                                                                    {...rest}
+                                                                    PreTag="div"
+                                                                    children={String(children).replace(/\n$/, '')}
+                                                                    language={match[1]}
+                                                                    style={vscDarkPlus}
+                                                                    customStyle={{ background: 'rgba(0,0,0,0.2)', margin: 0, borderRadius: '0.5rem', padding: '1rem' }}
+                                                                />
+                                                            ) : (
+                                                                <code {...rest} className={className}>
+                                                                    {children}
+                                                                </code>
+                                                            )
+                                                        }
+                                                    }}
+                                                >
+                                                    {content}
+                                                </ReactMarkdown>
+                                            </div>
                                         </div>
-                                    </div>
-                                </section>
+                                    </Panel>
+                                );
 
-                                {/* Action Buttons for Sidebar */}
-                                <div className="pt-4 space-y-2">
-                                    <Button
-                                        className="w-full justify-start gap-2 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border-none"
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => setShowTranscriptModal(true)}
+                                const ResizeHandle = (
+                                    <Separator className={cn(
+                                        "group relative flex items-center justify-center bg-border/40 hover:bg-indigo-500/40 transition-colors z-20",
+                                        orientation === 'horizontal' ? "w-1.5 cursor-col-resize" : "h-1.5 cursor-row-resize"
+                                    )}>
+                                        <div className={cn(
+                                            "z-50 flex items-center justify-center p-1 rounded-full bg-background border border-border transition-all duration-300 group-hover:scale-110 group-hover:border-indigo-500/50 group-active:scale-95 group-active:bg-indigo-500 group-active:text-white shadow-xl",
+                                            orientation === 'horizontal' ? "h-6 w-1 -mx-0.5" : "w-6 h-1 -my-0.5"
+                                        )} />
+                                    </Separator>
+                                );
+
+                                return isSwapped ? (
+                                    <>
+                                        {PreviewPanel}
+                                        {ResizeHandle}
+                                        {EditorPanel}
+                                    </>
+                                ) : (
+                                    <>
+                                        {EditorPanel}
+                                        {ResizeHandle}
+                                        {PreviewPanel}
+                                    </>
+                                );
+                            })()}
+                        </Group>
+                    </Panel>
+
+                    {/* Info Sidebar - Full Screen on Mobile */}
+                    {showInfoSidebar && (
+                        <>
+                            {!isMobile && (
+                                <Separator className="w-1.5 cursor-col-resize group relative flex items-center justify-center bg-border/40 hover:bg-indigo-500/40 transition-colors">
+                                    <div className="z-50 flex items-center justify-center p-1 rounded-full bg-background border border-border transition-all duration-300 group-hover:scale-110 group-hover:border-indigo-500/50 group-active:scale-95 group-active:bg-indigo-500 group-active:text-white shadow-xl h-6 w-1 -mx-0.5" />
+                                </Separator>
+                            )}
+                            <div className={cn(
+                                isMobile ? "fixed inset-x-0 bottom-0 top-16 z-[110] bg-background flex flex-col border-t border-border/40 shadow-2xl" : "block h-full"
+                            )}>
+                                {isMobile ? (
+                                    <motion.div
+                                        initial={{ x: '100%' }}
+                                        animate={{ x: 0 }}
+                                        exit={{ x: '100%' }}
+                                        transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+                                        className="h-full flex flex-col bg-background"
                                     >
-                                        <Code size={14} />
-                                        View Original Transcript
-                                    </Button>
-                                    <Button
-                                        className="w-full justify-start gap-2"
-                                        size="sm"
-                                        onClick={handleSave}
-                                        disabled={updateMutation.isPending}
-                                    >
-                                        {updateMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-                                        Save Changes
-                                    </Button>
-                                </div>
+                                        <InfoPanelContent
+                                            seoTitle={seoTitle} setSeoTitle={setSeoTitle}
+                                            seoDescription={seoDescription} setSeoDescription={setSeoDescription}
+                                            linkedinTeaser={linkedinTeaser} setLinkedinTeaser={setLinkedinTeaser}
+                                            xingSummary={xingSummary} setXingSummary={setXingSummary}
+                                            onClose={() => setShowInfoSidebar(false)}
+                                            onShowTranscript={() => setShowTranscriptModal(true)}
+                                            onSave={handleSave}
+                                            isPending={updateMutation.isPending}
+                                        />
+                                    </motion.div>
+                                ) : (
+                                    <Panel defaultSize={33} minSize={15} className="border-l border-border/40 bg-card/50 backdrop-blur-xl flex flex-col overflow-hidden h-full">
+                                        <InfoPanelContent
+                                            seoTitle={seoTitle} setSeoTitle={setSeoTitle}
+                                            seoDescription={seoDescription} setSeoDescription={setSeoDescription}
+                                            linkedinTeaser={linkedinTeaser} setLinkedinTeaser={setLinkedinTeaser}
+                                            xingSummary={xingSummary} setXingSummary={setXingSummary}
+                                            onClose={() => setShowInfoSidebar(false)}
+                                            onShowTranscript={() => setShowTranscriptModal(true)}
+                                            onSave={handleSave}
+                                            isPending={updateMutation.isPending}
+                                        />
+                                    </Panel>
+                                )}
                             </div>
-                        </motion.div>
+                        </>
                     )}
-                </AnimatePresence>
+                </Group>
             </div>
 
             {/* Transcript Modal */}
@@ -435,12 +463,13 @@ export const ArticleEditor: React.FC = () => {
                                         <p className="text-xs text-muted-foreground">The raw content extracted from the source.</p>
                                     </div>
                                 </div>
-                                <Button variant="ghost" size="icon" onClick={() => setShowTranscriptModal(false)}>
-                                    <ArrowLeft size={18} className="rotate-180" />
+                                <Button variant="secondary" size="sm" className="h-9 px-4 gap-2 shadow-sm border border-border/50" onClick={() => setShowTranscriptModal(false)}>
+                                    <span className="text-sm font-medium mr-1">Close</span>
+                                    <X size={16} />
                                 </Button>
                             </div>
                             <div className="flex-1 overflow-auto p-8 font-mono text-sm leading-relaxed text-foreground/80 whitespace-pre-wrap selection:bg-indigo-500/20">
-                                {article.rawTranscript}
+                                {article?.rawTranscript}
                             </div>
                             <div className="p-6 border-t border-border/40 bg-muted/30 flex justify-end">
                                 <Button onClick={() => setShowTranscriptModal(false)}>Close View</Button>
@@ -450,5 +479,111 @@ export const ArticleEditor: React.FC = () => {
                 )}
             </AnimatePresence>
         </motion.div>
+    );
+};
+
+// Extracted InfoPanelContent to reuse in mobile/desktop views
+const InfoPanelContent = ({
+    seoTitle, setSeoTitle,
+    seoDescription, setSeoDescription,
+    linkedinTeaser, setLinkedinTeaser,
+    xingSummary, setXingSummary,
+    onClose, onShowTranscript, onSave, isPending
+}: any) => {
+    return (
+        <>
+            <div className="p-4 md:p-6 border-b border-border/40 flex items-center justify-between bg-background/95 backdrop-blur-sm sticky top-0 z-10">
+                <h3 className="font-semibold text-base text-foreground flex items-center gap-2">
+                    <LinkIcon size={16} className="text-indigo-500" />
+                    Additional Info
+                </h3>
+                <Button variant="secondary" size="sm" className="h-9 px-4 gap-2 shadow-sm border border-border/50" onClick={onClose}>
+                    <span className="text-sm font-medium mr-1">Close</span>
+                    <X size={16} />
+                </Button>
+            </div>
+
+            <div className="flex-1 overflow-auto p-6 space-y-8">
+                {/* SEO Section */}
+                <section className="space-y-4">
+                    <h4 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                        <span className="w-1 h-4 bg-indigo-500 rounded-full" />
+                        SEO Metadata
+                    </h4>
+                    <div className="space-y-5">
+                        <div className="space-y-1.5">
+                            <label className="text-sm font-medium text-muted-foreground ml-1">SEO Title</label>
+                            <input
+                                type="text"
+                                value={seoTitle}
+                                onChange={(e) => setSeoTitle(e.target.value)}
+                                className="w-full text-sm bg-background/50 border border-border/50 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500/50 text-foreground transition-all shadow-sm"
+                                placeholder="Enter SEO title..."
+                            />
+                        </div>
+                        <div className="space-y-1.5">
+                            <label className="text-sm font-medium text-muted-foreground ml-1">SEO Description</label>
+                            <textarea
+                                value={seoDescription}
+                                onChange={(e) => setSeoDescription(e.target.value)}
+                                rows={4}
+                                className="w-full text-sm bg-background/50 border border-border/50 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500/50 text-foreground transition-all resize-none shadow-sm"
+                                placeholder="Enter meta description..."
+                            />
+                        </div>
+                    </div>
+                </section>
+
+                {/* Social Media Section */}
+                <section className="space-y-4">
+                    <h4 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                        <span className="w-1 h-4 bg-emerald-500 rounded-full" />
+                        Social Teasers
+                    </h4>
+                    <div className="space-y-5">
+                        <div className="space-y-1.5">
+                            <label className="text-sm font-medium text-muted-foreground ml-1">LinkedIn Teaser</label>
+                            <textarea
+                                value={linkedinTeaser}
+                                onChange={(e) => setLinkedinTeaser(e.target.value)}
+                                rows={5}
+                                className="w-full text-sm bg-background/50 border border-border/50 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500/50 text-foreground transition-all resize-none shadow-sm"
+                                placeholder="LinkedIn teaser content..."
+                            />
+                        </div>
+                        <div className="space-y-1.5">
+                            <label className="text-sm font-medium text-muted-foreground ml-1">Xing Summary</label>
+                            <textarea
+                                value={xingSummary}
+                                onChange={(e) => setXingSummary(e.target.value)}
+                                rows={5}
+                                className="w-full text-sm bg-background/50 border border-border/50 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500/50 text-foreground transition-all resize-none shadow-sm"
+                                placeholder="Xing summary content..."
+                            />
+                        </div>
+                    </div>
+                </section>
+
+                {/* Action Buttons for Sidebar */}
+                <div className="pt-6 space-y-3 pb-8">
+                    <Button
+                        className="w-full h-10 justify-start gap-3 bg-muted/50 hover:bg-muted text-muted-foreground border border-border/50"
+                        variant="ghost"
+                        onClick={onShowTranscript}
+                    >
+                        <Code size={16} />
+                        View Original Transcript
+                    </Button>
+                    <Button
+                        className="w-full h-10 justify-start gap-3 shadow-md"
+                        onClick={onSave}
+                        disabled={isPending}
+                    >
+                        {isPending ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                        Save All Changes
+                    </Button>
+                </div>
+            </div>
+        </>
     );
 };
