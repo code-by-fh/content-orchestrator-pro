@@ -5,7 +5,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { getArticle, updateArticle } from '../api';
+import { getArticle, updateArticle, publishToPlatform, unpublishFromPlatform, unpublishAllFromArticle } from '../api';
 import {
     Loader2,
     Link as LinkIcon,
@@ -21,14 +21,21 @@ import {
     Columns,
     Rows,
     Repeat,
-    X
+    X,
+    ExternalLink,
+    CheckCircle2,
+    AlertCircle,
+    Send,
+    Zap,
+    MousePointer2
+
 } from 'lucide-react';
+
 import { Button } from './ui/Button';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '../lib/utils';
 import type { Article } from '../types';
-import { ScheduleModal } from './ScheduleModal';
 import { Panel, Group, Separator } from 'react-resizable-panels';
 import { ConfirmationModal } from './ui/ConfirmationModal';
 
@@ -38,8 +45,8 @@ export const ArticleEditor: React.FC = () => {
     const navigate = useNavigate();
     const queryClient = useQueryClient();
     const [content, setContent] = useState('');
-    const [showScheduleModal, setShowScheduleModal] = useState(false);
     const [showUnpublishConfirm, setShowUnpublishConfirm] = useState(false);
+
     const [showInfoSidebar, setShowInfoSidebar] = useState(false);
     const [showTranscriptModal, setShowTranscriptModal] = useState(false);
     const [isMobile, setIsMobile] = useState(false);
@@ -49,6 +56,9 @@ export const ArticleEditor: React.FC = () => {
     const [seoDescription, setSeoDescription] = useState('');
     const [linkedinTeaser, setLinkedinTeaser] = useState('');
     const [xingSummary, setXingSummary] = useState('');
+    const [platformTokens, setPlatformTokens] = useState<Record<string, string>>({});
+    const [showPublishModal, setShowPublishModal] = useState(false);
+
 
     // Panel Layout State
     const [isSwapped, setIsSwapped] = useState(false);
@@ -108,6 +118,52 @@ export const ArticleEditor: React.FC = () => {
         }
     });
 
+    const publishPlatformMutation = useMutation({
+        mutationFn: ({ platform, token }: { platform: string, token?: string }) =>
+            publishToPlatform(id!, platform, token),
+        onSuccess: (_, variables) => {
+
+            queryClient.invalidateQueries({ queryKey: ['article', id] });
+            toast.success(`Published to ${variables.platform}!`);
+        },
+        onError: (error: any) => {
+            toast.error(`Failed to publish: ${error.response?.data?.message || error.message}`);
+        }
+    });
+
+    const handlePlatformPublish = (platform: string) => {
+        publishPlatformMutation.mutate({
+            platform,
+            token: platformTokens[platform]
+        });
+    };
+
+    const unpublishPlatformMutation = useMutation({
+        mutationFn: (platform: string) => unpublishFromPlatform(id!, platform),
+        onSuccess: (_, platform) => {
+
+            queryClient.invalidateQueries({ queryKey: ['article', id] });
+            toast.success(`Unpublished from ${platform}!`);
+        },
+        onError: (error: any) => {
+            toast.error(`Failed to unpublish: ${error.response?.data?.message || error.message}`);
+        }
+    });
+
+    const handlePlatformUnpublish = (platform: string) => {
+        unpublishPlatformMutation.mutate(platform);
+    };
+
+
+    const handlePublishAll = () => {
+        article?.availablePlatforms?.forEach(p => {
+            if (p.couldAutoPublish) {
+                handlePlatformPublish(p.platform);
+            }
+        });
+    };
+
+
     const getMetadataPayload = () => ({
         seoTitle,
         seoDescription,
@@ -123,12 +179,9 @@ export const ArticleEditor: React.FC = () => {
     };
 
     const handlePublish = () => {
-        updateMutation.mutate({
-            markdownContent: content,
-            status: 'PUBLISHED',
-            ...getMetadataPayload()
-        });
+        setShowPublishModal(true);
     };
+
 
     const handleSchedule = (dateTime: Date) => {
         const isoString = dateTime.toISOString();
@@ -140,13 +193,31 @@ export const ArticleEditor: React.FC = () => {
         });
     };
 
-    const handleUnpublish = () => {
+    const unpublishAllMutation = useMutation({
+        mutationFn: () => unpublishAllFromArticle(id!),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['article', id] });
+            toast.success(`Unpublished from all platforms!`);
+        },
+        onError: (error: any) => {
+            toast.error(`Failed to unpublish all: ${error.response?.data?.message || error.message}`);
+        }
+    });
+
+    const handleUnpublishAll = () => {
         updateMutation.mutate({
             status: 'DRAFT',
-            scheduledAt: null as any // Clear scheduled date when unpublishing
+            scheduledAt: null as any
         });
+        unpublishAllMutation.mutate();
+    };
+
+    const handleUnpublish = () => {
+        handleUnpublishAll();
         setShowUnpublishConfirm(false);
     };
+
+
 
     const insertText = (before: string, after: string = '') => {
         const textarea = textareaRef.current;
@@ -199,7 +270,8 @@ export const ArticleEditor: React.FC = () => {
                             </p>
                             {article.status === 'SCHEDULED' && article.scheduledAt && (
                                 <button
-                                    onClick={() => setShowScheduleModal(true)}
+                                    onClick={() => setShowPublishModal(true)}
+
                                     className="text-[10px] text-blue-400 hover:text-blue-300 flex items-center gap-1 hover:underline cursor-pointer whitespace-nowrap"
                                 >
                                     <Calendar size={10} />
@@ -263,20 +335,7 @@ export const ArticleEditor: React.FC = () => {
                         </Button>
                     </motion.div>
 
-                    {(article.status === 'PUBLISHED' || article.status === 'SCHEDULED') && (
-                        <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="shrink-0">
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => setShowUnpublishConfirm(true)}
-                                disabled={updateMutation.isPending}
-                                className="gap-2 px-2 md:px-4 text-amber-500 hover:text-amber-600 hover:bg-amber-500/10"
-                            >
-                                <X size={16} />
-                                <span className="hidden md:inline">Unpublish</span>
-                            </Button>
-                        </motion.div>
-                    )}
+
 
                     <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="shrink-0">
                         <Button
@@ -291,12 +350,7 @@ export const ArticleEditor: React.FC = () => {
                     </motion.div>
                 </div>
 
-                <ScheduleModal
-                    isOpen={showScheduleModal}
-                    onClose={() => setShowScheduleModal(false)}
-                    onSchedule={handleSchedule}
-                    currentScheduledAt={article.scheduledAt}
-                />
+
             </header>
 
             {/* Editor Workspace */}
@@ -332,7 +386,7 @@ export const ArticleEditor: React.FC = () => {
                                                 value={content}
                                                 onChange={(e) => setContent(e.target.value)}
                                                 placeholder="Start writing your masterpiece..."
-                                                className="flex-1 w-full p-4 md:p-8 resize-none bg-transparent focus:outline-none font-mono text-sm leading-relaxed text-foreground/80 placeholder:text-muted-foreground/30 scroll-smooth selection:bg-indigo-500/20"
+                                                className="flex-1 w-full p-4 md:p-8 resize-none bg-transparent focus:outline-none font-mono text-sm leading-relaxed text-foreground/80 placeholder:text-muted-foreground/30 scroll-smooth selection:bg-indigo-500/20 custom-scrollbar"
                                             />
                                         </div>
                                     </Panel>
@@ -345,7 +399,7 @@ export const ArticleEditor: React.FC = () => {
                                         </div>
                                         <div
                                             ref={previewRef}
-                                            className="h-full overflow-auto scroll-smooth"
+                                            className="h-full overflow-y-scroll scroll-smooth custom-scrollbar"
                                         >
                                             <div className="max-w-2xl mx-auto py-8 md:py-12 px-4 md:px-8
                                                 prose prose-slate dark:prose-invert
@@ -411,53 +465,51 @@ export const ArticleEditor: React.FC = () => {
                         </Group>
                     </Panel>
 
-                    {/* Info Sidebar - Full Screen on Mobile */}
-                    {showInfoSidebar && (
+                    {/* Info Sidebar - Desktop (Direct Panel Child for Resizability) */}
+                    {showInfoSidebar && !isMobile && (
                         <>
-                            {!isMobile && (
-                                <Separator className="w-1.5 cursor-col-resize group relative flex items-center justify-center bg-border/40 hover:bg-indigo-500/40 transition-colors">
-                                    <div className="z-50 flex items-center justify-center p-1 rounded-full bg-background border border-border transition-all duration-300 group-hover:scale-110 group-hover:border-indigo-500/50 group-active:scale-95 group-active:bg-indigo-500 group-active:text-white shadow-xl h-6 w-1 -mx-0.5" />
-                                </Separator>
-                            )}
-                            <div className={cn(
-                                isMobile ? "fixed inset-x-0 bottom-0 top-16 z-[110] bg-background flex flex-col border-t border-border/40 shadow-2xl" : "block h-full"
-                            )}>
-                                {isMobile ? (
-                                    <motion.div
-                                        initial={{ x: '100%' }}
-                                        animate={{ x: 0 }}
-                                        exit={{ x: '100%' }}
-                                        transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                                        className="h-full flex flex-col bg-background"
-                                    >
-                                        <InfoPanelContent
-                                            seoTitle={seoTitle} setSeoTitle={setSeoTitle}
-                                            seoDescription={seoDescription} setSeoDescription={setSeoDescription}
-                                            linkedinTeaser={linkedinTeaser} setLinkedinTeaser={setLinkedinTeaser}
-                                            xingSummary={xingSummary} setXingSummary={setXingSummary}
-                                            onClose={() => setShowInfoSidebar(false)}
-                                            onShowTranscript={() => setShowTranscriptModal(true)}
-                                            onSave={handleSave}
-                                            isPending={updateMutation.isPending}
-                                        />
-                                    </motion.div>
-                                ) : (
-                                    <Panel defaultSize={33} minSize={15} className="border-l border-border/40 bg-card/50 backdrop-blur-xl flex flex-col overflow-hidden h-full">
-                                        <InfoPanelContent
-                                            seoTitle={seoTitle} setSeoTitle={setSeoTitle}
-                                            seoDescription={seoDescription} setSeoDescription={setSeoDescription}
-                                            linkedinTeaser={linkedinTeaser} setLinkedinTeaser={setLinkedinTeaser}
-                                            xingSummary={xingSummary} setXingSummary={setXingSummary}
-                                            onClose={() => setShowInfoSidebar(false)}
-                                            onShowTranscript={() => setShowTranscriptModal(true)}
-                                            onSave={handleSave}
-                                            isPending={updateMutation.isPending}
-                                        />
-                                    </Panel>
-                                )}
-                            </div>
+                            <Separator className="w-1.5 cursor-col-resize group relative flex items-center justify-center bg-border/40 hover:bg-indigo-500/40 transition-colors">
+                                <div className="z-50 flex items-center justify-center p-1 rounded-full bg-background border border-border transition-all duration-300 group-hover:scale-110 group-hover:border-indigo-500/50 group-active:scale-95 group-active:bg-indigo-500 group-active:text-white shadow-xl h-6 w-1 -mx-0.5" />
+                            </Separator>
+                            <Panel defaultSize={33} minSize={15} className="border-l border-border/40 bg-card/50 backdrop-blur-xl flex flex-col overflow-hidden h-full">
+                                <InfoPanelContent
+                                    seoTitle={seoTitle} setSeoTitle={setSeoTitle}
+                                    seoDescription={seoDescription} setSeoDescription={setSeoDescription}
+                                    linkedinTeaser={linkedinTeaser} setLinkedinTeaser={setLinkedinTeaser}
+                                    xingSummary={xingSummary} setXingSummary={setXingSummary}
+                                    onClose={() => setShowInfoSidebar(false)}
+                                    onShowTranscript={() => setShowTranscriptModal(true)}
+                                    onSave={handleSave}
+                                    isPending={updateMutation.isPending}
+                                />
+                            </Panel>
                         </>
                     )}
+
+                    {/* Info Sidebar - Mobile (Fixed Overlay) */}
+                    {showInfoSidebar && isMobile && (
+                        <div className="fixed inset-x-0 bottom-0 top-16 z-[110] bg-background flex flex-col border-t border-border/40 shadow-2xl">
+                            <motion.div
+                                initial={{ x: '100%' }}
+                                animate={{ x: 0 }}
+                                exit={{ x: '100%' }}
+                                transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+                                className="h-full flex flex-col bg-background"
+                            >
+                                <InfoPanelContent
+                                    seoTitle={seoTitle} setSeoTitle={setSeoTitle}
+                                    seoDescription={seoDescription} setSeoDescription={setSeoDescription}
+                                    linkedinTeaser={linkedinTeaser} setLinkedinTeaser={setLinkedinTeaser}
+                                    xingSummary={xingSummary} setXingSummary={setXingSummary}
+                                    onClose={() => setShowInfoSidebar(false)}
+                                    onShowTranscript={() => setShowTranscriptModal(true)}
+                                    onSave={handleSave}
+                                    isPending={updateMutation.isPending}
+                                />
+                            </motion.div>
+                        </div>
+                    )}
+
                 </Group>
             </div>
 
@@ -514,6 +566,31 @@ export const ArticleEditor: React.FC = () => {
                 variant="warning"
                 isLoading={updateMutation.isPending}
             />
+
+            <PublishOptionsModal
+                isOpen={showPublishModal}
+                onClose={() => setShowPublishModal(false)}
+                publications={article?.publications}
+                availablePlatforms={article?.availablePlatforms}
+                onPublishPlatform={handlePlatformPublish}
+                onUnpublishPlatform={handlePlatformUnpublish}
+                onUnpublishAll={handleUnpublishAll}
+                onPublishAll={handlePublishAll}
+
+
+                onSchedule={handleSchedule}
+
+                platformTokens={platformTokens}
+                setPlatformTokens={setPlatformTokens}
+                isPublishing={publishPlatformMutation.isPending}
+                scheduledAt={article?.scheduledAt}
+                sourceUrl={article?.sourceUrl}
+                onUnpublish={() => setShowUnpublishConfirm(true)}
+                status={article?.status}
+            />
+
+
+
         </motion.div>
     );
 };
@@ -526,6 +603,8 @@ const InfoPanelContent = ({
     xingSummary, setXingSummary,
     onClose, onShowTranscript, onSave, isPending
 }: any) => {
+
+
     return (
         <>
             <div className="p-4 md:p-6 border-b border-border/40 flex items-center justify-between bg-background/95 backdrop-blur-sm sticky top-0 z-10">
@@ -539,7 +618,7 @@ const InfoPanelContent = ({
                 </Button>
             </div>
 
-            <div className="flex-1 overflow-auto p-6 space-y-8">
+            <div className="flex-1 overflow-y-scroll p-6 space-y-8 scroll-smooth min-h-0 custom-scrollbar">
                 {/* SEO Section */}
                 <section className="space-y-4">
                     <h4 className="text-sm font-semibold text-foreground flex items-center gap-2">
@@ -600,6 +679,9 @@ const InfoPanelContent = ({
                     </div>
                 </section>
 
+
+
+
                 {/* Action Buttons for Sidebar */}
                 <div className="pt-6 space-y-3 pb-8">
                     <Button
@@ -623,3 +705,417 @@ const InfoPanelContent = ({
         </>
     );
 };
+
+const PublishOptionsModal = ({
+    isOpen,
+    onClose,
+    publications,
+    availablePlatforms,
+    onPublishPlatform,
+    onUnpublishPlatform,
+    onUnpublishAll,
+    onPublishAll,
+    onSchedule,
+    platformTokens,
+    setPlatformTokens,
+    isPublishing,
+    scheduledAt,
+    sourceUrl,
+    onUnpublish,
+    status
+}: any) => {
+
+
+
+    const [isScheduling, setIsScheduling] = useState(false);
+    const [dateTimeValue, setDateTimeValue] = useState('');
+    const [error, setError] = useState('');
+
+    const autoPlatforms = availablePlatforms?.filter((p: any) => p.couldAutoPublish) || [];
+    const manualPlatforms = availablePlatforms?.filter((p: any) => !p.couldAutoPublish) || [];
+
+    const isLiveOrScheduled = status === 'PUBLISHED' || status === 'SCHEDULED';
+
+
+    const handleXingShare = () => {
+        if (!sourceUrl) return;
+        const xingUrl = `https://www.xing.com/spi/shares/new?url=${encodeURIComponent(sourceUrl)}`;
+        window.open(xingUrl, '_blank', 'width=600,height=500');
+    };
+
+
+    useEffect(() => {
+        if (isOpen && scheduledAt) {
+            const date = new Date(scheduledAt);
+            const localDateTime = new Date(date.getTime() - date.getTimezoneOffset() * 60000)
+                .toISOString()
+                .slice(0, 16);
+            setDateTimeValue(localDateTime);
+        } else if (isOpen) {
+            const date = new Date();
+            date.setHours(date.getHours() + 1);
+            const localDateTime = new Date(date.getTime() - date.getTimezoneOffset() * 60000)
+                .toISOString()
+                .slice(0, 16);
+            setDateTimeValue(localDateTime);
+        }
+    }, [isOpen, scheduledAt]);
+
+    const handleConfirmSchedule = () => {
+        if (!dateTimeValue) {
+            setError('Select a date and time');
+            return;
+        }
+        const selectedDate = new Date(dateTimeValue);
+        if (selectedDate <= new Date()) {
+            setError('Time must be in the future');
+            return;
+        }
+        onSchedule(selectedDate);
+        setIsScheduling(false);
+    };
+
+    return (
+        <AnimatePresence>
+            {isOpen && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        onClick={onClose}
+                        className="absolute inset-0 bg-background/80 backdrop-blur-sm"
+                    />
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                        className="relative w-full max-w-lg bg-card border border-border/40 rounded-2xl shadow-2xl overflow-hidden flex flex-col"
+                    >
+                        <div className="p-6 border-b border-border/40 flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 rounded-lg bg-blue-500/10 text-blue-500">
+                                    <UploadCloud size={20} />
+                                </div>
+                                <div>
+                                    <h2 className="text-lg font-bold">Publish Article</h2>
+                                    <p className="text-xs text-muted-foreground">Select platforms to publish your content.</p>
+                                </div>
+                            </div>
+                            <Button variant="ghost" size="icon" className="rounded-full h-8 w-8" onClick={onClose}>
+                                <X size={18} />
+                            </Button>
+                        </div>
+
+                        <div className="p-6 space-y-6 max-h-[70vh] overflow-auto custom-scrollbar">
+                            <div className="space-y-4">
+                                {/* Scheduling Section */}
+                                {status !== 'PUBLISHED' && (
+                                    <div className="space-y-3 bg-blue-500/5 p-4 rounded-xl border border-blue-500/10 mb-2">
+                                        <div className="flex items-center justify-between">
+                                            <div className="space-y-0.5">
+                                                <h4 className="text-sm font-semibold text-foreground italic flex items-center gap-2">
+                                                    <Calendar size={14} className="text-blue-500" />
+                                                    Scheduling
+                                                </h4>
+                                                <p className="text-[11px] text-muted-foreground">
+                                                    {scheduledAt
+                                                        ? `Scheduled for ${new Date(scheduledAt).toLocaleString()}`
+                                                        : "Plan your publication ahead."
+                                                    }
+                                                </p>
+                                            </div>
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                className={cn(
+                                                    "h-8 gap-2 border-blue-500/20 transition-all shadow-sm",
+                                                    isScheduling ? "bg-blue-500 text-white border-transparent" : "hover:bg-blue-500/5 hover:border-blue-500/40"
+                                                )}
+                                                onClick={() => setIsScheduling(!isScheduling)}
+                                            >
+                                                <Calendar size={14} />
+                                                <span className="text-xs">{scheduledAt ? "Reschedule" : "Schedule"}</span>
+                                            </Button>
+                                        </div>
+
+                                        <AnimatePresence>
+                                            {isScheduling && (
+                                                <motion.div
+                                                    initial={{ height: 0, opacity: 0 }}
+                                                    animate={{ height: 'auto', opacity: 1 }}
+                                                    exit={{ height: 0, opacity: 0 }}
+                                                    className="overflow-hidden"
+                                                >
+                                                    <div className="pt-2 space-y-3">
+                                                        <div className="space-y-1.5">
+                                                            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider ml-1">Select Date & Time</label>
+                                                            <input
+                                                                type="datetime-local"
+                                                                value={dateTimeValue}
+                                                                onChange={(e) => setDateTimeValue(e.target.value)}
+                                                                className="w-full text-sm bg-background border border-border/60 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500/40"
+                                                            />
+                                                        </div>
+                                                        {error && <p className="text-[10px] text-red-500 font-medium ml-1">{error}</p>}
+                                                        <div className="flex gap-2">
+                                                            <Button
+                                                                size="sm"
+                                                                className="flex-1 h-9 bg-blue-500 hover:bg-blue-600 text-white shadow-md shadow-blue-500/20"
+                                                                onClick={handleConfirmSchedule}
+                                                            >
+                                                                Confirm Schedule
+                                                            </Button>
+                                                            <Button
+                                                                size="sm"
+                                                                variant="ghost"
+                                                                className="h-9"
+                                                                onClick={() => setIsScheduling(false)}
+                                                            >
+                                                                Cancel
+                                                            </Button>
+                                                        </div>
+                                                    </div>
+                                                </motion.div>
+                                            )}
+                                        </AnimatePresence>
+                                    </div>
+                                )}
+
+
+                                {status !== 'PUBLISHED' && (
+                                    <div className="flex items-center justify-between bg-emerald-500/5 p-4 rounded-xl border border-emerald-500/10 mb-2">
+                                        <div className="space-y-0.5">
+                                            <h4 className="text-sm font-semibold text-foreground">Publication Status</h4>
+                                            <p className="text-[11px] text-muted-foreground">Track where your article is live.</p>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                className="h-8 gap-2 border-amber-500/20 text-amber-600 hover:bg-amber-500/5 hover:border-amber-500/40 transition-all shadow-sm"
+                                                onClick={onUnpublishAll}
+                                                disabled={isPublishing}
+                                            >
+                                                <X size={14} />
+                                                <span className="text-xs font-semibold">Unpublish All</span>
+                                            </Button>
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                className="h-8 gap-2 border-emerald-500/20 hover:bg-emerald-500/5 hover:border-emerald-500/40 transition-all shadow-sm"
+                                                onClick={onPublishAll}
+                                                disabled={isPublishing}
+                                            >
+                                                <Repeat size={14} className={cn(isPublishing && "animate-spin")} />
+                                                <span className="text-xs">Auto Publish All</span>
+                                            </Button>
+                                        </div>
+                                    </div>
+                                )}
+
+
+
+
+                                <div className="space-y-4">
+                                    {autoPlatforms.length > 0 && (
+                                        <div className="space-y-3">
+                                            <div className="flex items-center gap-2 mb-1 px-1">
+                                                <Zap size={14} className="text-emerald-500 fill-emerald-500/20" />
+                                                <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Automatic Distribution</span>
+                                            </div>
+                                            {autoPlatforms.map((p: any) => {
+                                                const pub = publications?.find((pub: any) => pub.platform === p.platform);
+                                                const isLive = pub?.status === 'PUBLISHED';
+
+                                                return (
+                                                    <div key={p.platform} className={cn(
+                                                        "rounded-xl p-4 space-y-4 transition-all border",
+                                                        isLive
+                                                            ? "bg-emerald-500/[0.05] border-emerald-500/20 shadow-sm"
+                                                            : "bg-muted/30 border-border/40 hover:bg-muted/40 hover:border-border/60"
+                                                    )}>
+                                                        <div className="flex items-center justify-between">
+                                                            <div className="flex items-center gap-3">
+                                                                <div className={cn(
+                                                                    "w-2.5 h-2.5 rounded-full shadow-sm",
+                                                                    isLive ? "bg-emerald-500 shadow-emerald-500/20" :
+                                                                        pub?.status === 'ERROR' ? "bg-red-500 shadow-red-500/20" : "bg-muted-foreground/20 shadow-sm"
+                                                                )} />
+                                                                <div className="flex flex-col">
+                                                                    <span className="font-semibold text-sm leading-tight text-foreground">{p.name}</span>
+                                                                    <span className="text-[10px] text-muted-foreground font-medium">
+                                                                        {isLive ? 'Online' : 'Ready for auto-distribution'}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                            {isLive ? (
+                                                                <div className="flex items-center gap-2">
+                                                                    <div className="text-emerald-500 flex items-center gap-1.5 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20">
+                                                                        <CheckCircle2 size={12} />
+                                                                        <span className="text-[10px] font-bold uppercase tracking-wider">Live</span>
+                                                                        {pub.platformId && <ExternalLink size={10} className="hover:scale-110 transition-transform cursor-pointer" />}
+                                                                    </div>
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="icon"
+                                                                        className="h-8 w-8 text-amber-500 hover:text-amber-600 hover:bg-amber-500/10 rounded-full"
+                                                                        onClick={() => onUnpublishPlatform(p.platform)}
+                                                                        title="Unpublish from this platform"
+                                                                    >
+                                                                        <X size={14} />
+                                                                    </Button>
+                                                                </div>
+                                                            ) : (
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant="default"
+                                                                    className="h-8 px-4 gap-2 bg-primary hover:bg-primary/90 shadow-md shadow-primary/10"
+                                                                    onClick={() => onPublishPlatform(p.platform)}
+                                                                    disabled={isPublishing}
+                                                                >
+                                                                    {isPublishing ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />}
+                                                                    <span className="text-xs font-medium">Publish</span>
+                                                                </Button>
+                                                            )}
+                                                        </div>
+
+                                                    </div>
+                                                );
+                                            })}
+
+                                        </div>
+                                    )}
+
+                                    {manualPlatforms.length > 0 && (
+                                        <div className="space-y-3 pt-2">
+                                            <div className="flex items-center gap-2 mb-1 px-1">
+                                                <MousePointer2 size={14} className="text-amber-500" />
+                                                <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Manual Sharing / Verification</span>
+                                            </div>
+                                            {manualPlatforms.map((p: any) => {
+                                                const pub = publications?.find((pub: any) => pub.platform === p.platform);
+                                                const isXing = p.platform === 'XING';
+                                                const isLive = pub?.status === 'PUBLISHED';
+
+                                                return (
+                                                    <div key={p.platform} className={cn(
+                                                        "rounded-xl p-4 space-y-4 transition-all border",
+                                                        isLive
+                                                            ? "bg-emerald-500/[0.05] border-emerald-500/20 shadow-sm"
+                                                            : "bg-amber-500/[0.03] border-amber-500/10 hover:bg-amber-500/[0.06] hover:border-amber-500/20"
+                                                    )}>
+                                                        <div className="flex items-center justify-between">
+                                                            <div className="flex items-center gap-3">
+                                                                <div className={cn(
+                                                                    "w-2.5 h-2.5 rounded-full shadow-sm",
+                                                                    isLive ? "bg-emerald-500 shadow-emerald-500/20" :
+                                                                        pub?.status === 'ERROR' ? "bg-red-500 shadow-red-500/20" : "bg-amber-500 shadow-amber-500/20"
+                                                                )} />
+                                                                <div className="flex flex-col">
+                                                                    <span className="font-semibold text-sm leading-tight text-foreground">{p.name}</span>
+                                                                    <span className={cn(
+                                                                        "text-[10px] font-medium",
+                                                                        isLive ? "text-muted-foreground" : "text-amber-600/70"
+                                                                    )}>
+                                                                        {isLive ? 'Online' : 'Manual action required'}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                            {isLive ? (
+                                                                <div className="flex items-center gap-2">
+                                                                    <div className="text-emerald-500 flex items-center gap-1.5 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20">
+                                                                        <CheckCircle2 size={12} />
+                                                                        <span className="text-[10px] font-bold uppercase tracking-wider">Live</span>
+                                                                        {pub.platformId && <ExternalLink size={10} className="hover:scale-110 transition-transform cursor-pointer" />}
+                                                                    </div>
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="icon"
+                                                                        className="h-8 w-8 text-amber-500 hover:text-amber-600 hover:bg-amber-500/10 rounded-full"
+                                                                        onClick={() => onUnpublishPlatform(p.platform)}
+                                                                        title="Unpublish from this platform"
+                                                                    >
+                                                                        <X size={14} />
+                                                                    </Button>
+                                                                </div>
+                                                            ) : (
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant="default"
+                                                                    className="h-8 px-4 gap-2 bg-amber-500 hover:bg-amber-600 border-none shadow-md shadow-amber-500/10 text-white"
+                                                                    onClick={isXing ? handleXingShare : () => onPublishPlatform(p.platform)}
+                                                                    disabled={isPublishing}
+                                                                >
+                                                                    {isXing ? <ExternalLink size={12} /> : (isPublishing ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />)}
+                                                                    <span className="text-xs font-medium">{isXing ? 'Share on Xing' : 'Publish'}</span>
+                                                                </Button>
+                                                            )}
+                                                        </div>
+
+
+                                                        {!isXing && !isLive && (
+                                                            <div className="space-y-2 pt-1 border-t border-border/20 mt-2">
+                                                                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Access Token</label>
+                                                                <input
+                                                                    type="password"
+                                                                    value={platformTokens[p.platform] || ''}
+                                                                    onChange={(e) => setPlatformTokens({
+                                                                        ...platformTokens,
+                                                                        [p.platform]: e.target.value
+                                                                    })}
+                                                                    className="w-full text-xs bg-background border border-border/60 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40 transition-all"
+                                                                    placeholder={`Paste your ${p.name} token here...`}
+                                                                />
+                                                            </div>
+                                                        )}
+
+                                                        {pub?.status === 'ERROR' && (
+                                                            <div className="flex items-start gap-2 text-red-500 bg-red-500/5 p-3 rounded-lg border border-red-500/20">
+                                                                <AlertCircle size={14} className="mt-0.5 shrink-0" />
+                                                                <p className="text-[11px] leading-relaxed italic">{pub.errorMessage || 'Action required.'}</p>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+                                </div>
+
+                            </div>
+                        </div>
+
+                        <div className="p-6 border-t border-border/40 bg-muted/20 flex items-center justify-between gap-3">
+                            <div>
+                                {isLiveOrScheduled && (
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={onUnpublish}
+                                        className="text-amber-600 hover:text-amber-700 hover:bg-amber-500/10 gap-2 h-9"
+                                    >
+                                        <X size={14} />
+                                        <span className="text-xs font-semibold">Back to Draft</span>
+                                    </Button>
+                                )}
+                            </div>
+                            <div className="flex gap-3">
+                                <Button variant="ghost" onClick={onClose} className="h-9 font-medium">Close</Button>
+                                <Button
+                                    variant="default"
+                                    onClick={onClose}
+                                    className="h-9 px-6 font-semibold"
+                                >
+                                    Done
+                                </Button>
+                            </div>
+                        </div>
+                    </motion.div>
+                </div>
+            )}
+        </AnimatePresence>
+    );
+};
+
+

@@ -58,4 +58,22 @@ export const updateArticle = async (id: string, data: Partial<Article>): Promise
     return response.data;
 };
 
+export const publishToPlatform = async (id: string, platform: string, accessToken?: string): Promise<{ message: string; platformId?: string }> => {
+    const response = await api.post(`/content/${id}/publish`, { platform, accessToken });
+    return response.data;
+};
+
+export const unpublishFromPlatform = async (id: string, platform: string): Promise<{ message: string }> => {
+    const response = await api.post(`/content/${id}/unpublish`, { platform });
+    return response.data;
+};
+
+export const unpublishAllFromArticle = async (id: string): Promise<{ message: string }> => {
+    const response = await api.post(`/content/${id}/unpublish-all`);
+    return response.data;
+};
+
+
+
 export default api;
+

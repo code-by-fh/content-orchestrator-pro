@@ -1,5 +1,24 @@
 export type ArticleStatus = 'DRAFT' | 'QUEUED' | 'PROCESSING' | 'COMPLETED' | 'SCHEDULED' | 'PUBLISHED' | 'ERROR';
 
+export type Platform = 'XING' | 'LINKEDIN' | 'MEDIUM' | 'RSS';
+
+export type PublicationStatus = 'PENDING' | 'PUBLISHED' | 'ERROR';
+
+export interface Publication {
+    id: string;
+    platform: Platform;
+    status: PublicationStatus;
+    platformId?: string;
+    errorMessage?: string;
+    publishedAt?: string;
+}
+
+export interface AvailablePlatform {
+    platform: Platform;
+    name: string;
+    couldAutoPublish: boolean;
+}
+
 export interface Article {
     id: string;
     title: string;
@@ -15,7 +34,10 @@ export interface Article {
     scheduledAt?: string;
     publishedAt?: string;
     createdAt: string;
+    publications: Publication[];
+    availablePlatforms?: AvailablePlatform[];
 }
+
 
 export interface User {
     id: string;

@@ -1,5 +1,7 @@
 import { Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Platform, PublicationStatus } from '@prisma/client';
+import { publishingService } from '../services/publishingService';
+
 import { z } from 'zod';
 import { addContentJob } from '../queue/producer';
 import { extractVideoId } from '../services/youtube';
@@ -49,21 +51,95 @@ export const getArticles = async (req: Request, res: Response) => {
 
 export const getArticle = async (req: Request, res: Response) => {
     const { id } = req.params;
-    const article = await prisma.article.findUnique({ where: { id: id as string } });
+    const article = await prisma.article.findUnique({
+        where: { id: id as string },
+        include: { publications: true }
+    });
     if (!article) return res.status(404).json({ message: 'Article not found' });
-    res.json(article);
+
+    // Add available platforms info
+    const platforms = publishingService.getAdapters();
+
+    res.json({ ...article, availablePlatforms: platforms });
 };
 
-import { deleteFromLinkedIn } from '../services/linkedin';
+export const publishToPlatform = async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const { platform, accessToken } = req.body;
+
+    if (!platform || !Object.values(Platform).includes(platform)) {
+        return res.status(400).json({ message: 'Invalid or missing platform' });
+    }
+
+    try {
+        const result = await publishingService.publishToPlatform(id, platform as Platform, accessToken);
+        if (result.success) {
+            res.json({ message: `Successfully published to ${platform}`, platformId: result.platformId });
+        } else {
+            res.status(500).json({ message: `Failed to publish to ${platform}`, error: result.error });
+        }
+    } catch (error: any) {
+        console.error(error);
+        res.status(500).json({ message: error.message || 'Internal server error' });
+    }
+};
+
+export const unpublishFromPlatform = async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const { platform } = req.body;
+
+    if (!platform || !Object.values(Platform).includes(platform)) {
+        return res.status(400).json({ message: 'Invalid or missing platform' });
+    }
+
+    try {
+        await publishingService.unpublishFromPlatform(id, platform as Platform);
+        res.json({ message: `Successfully unpublished from ${platform}` });
+    } catch (error: any) {
+        console.error(error);
+        res.status(500).json({ message: error.message || 'Internal server error' });
+    }
+};
+
+
+export const unpublishAllPlatforms = async (req: Request, res: Response) => {
+    const { id } = req.params;
+
+    try {
+        const publications = await prisma.publication.findMany({
+            where: { articleId: id }
+        });
+
+        for (const pub of publications) {
+            await publishingService.unpublishFromPlatform(id, pub.platform);
+        }
+
+        res.json({ message: `Successfully unpublished from all platforms` });
+    } catch (error: any) {
+        console.error(error);
+        res.status(500).json({ message: error.message || 'Internal server error' });
+    }
+};
+
+
+
+
+
+
 
 export const deleteArticle = async (req: Request, res: Response) => {
     const { id } = req.params;
     try {
         const article = await prisma.article.findUnique({ where: { id: id as string } });
 
-        if (article && (article.status === 'PUBLISHED' || article.status === 'SCHEDULED')) {
-            console.log(`[Content] Article ${id} is ${article.status}. Unpublishing before deletion...`);
-            await deleteFromLinkedIn(article);
+        if (article) {
+            const publications = await prisma.publication.findMany({
+                where: { articleId: id }
+            });
+
+            for (const pub of publications) {
+                await publishingService.unpublishFromPlatform(id, pub.platform);
+            }
         }
 
         await prisma.article.delete({ where: { id: id as string } });
@@ -73,6 +149,7 @@ export const deleteArticle = async (req: Request, res: Response) => {
         res.status(500).json({ message: 'Failed to delete article' });
     }
 };
+
 
 export const updateArticle = async (req: Request, res: Response) => {
     const { id } = req.params;

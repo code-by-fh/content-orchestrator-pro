@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getArticles, createArticle, deleteArticle, updateArticle } from '../api';
+import { getArticles, createArticle, deleteArticle, updateArticle, unpublishAllFromArticle } from '../api';
 import { Link } from 'react-router-dom';
 import { Plus, Youtube, FileText, Loader2, Clock, CheckCircle, AlertCircle, RefreshCw, Trash2, Calendar, Search, Filter } from 'lucide-react';
 import { Button } from './ui/Button';
@@ -75,6 +75,18 @@ export const ArticleList: React.FC = () => {
             toast.error("Failed to update article");
         }
     });
+
+    const unpublishMutation = useMutation({
+        mutationFn: (id: string) => unpublishAllFromArticle(id),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['articles'] });
+            toast.success("Unpublished from all platforms");
+        },
+        onError: (error: any) => {
+            toast.error(`Failed to unpublish: ${error.message}`);
+        }
+    });
+
 
     // Filtering logic
     const filteredArticles = articles?.filter(article => {
@@ -220,7 +232,8 @@ export const ArticleList: React.FC = () => {
                                                         article={article}
                                                         onDelete={() => setConfirmDeleteItem({ id: article.id, status: article.status })}
                                                         onUnpublish={(id) => setConfirmUnpublishItem({ id })}
-                                                        isUnpublishing={updateMutation.isPending && updateMutation.variables?.id === article.id}
+                                                        isUnpublishing={unpublishMutation.isPending && unpublishMutation.variables === article.id}
+
                                                     />
                                                 </div>
                                             </div>
@@ -269,6 +282,7 @@ export const ArticleList: React.FC = () => {
                 onConfirm={() => {
                     if (confirmUnpublishItem) {
                         updateMutation.mutate({ id: confirmUnpublishItem.id, status: 'DRAFT' });
+                        unpublishMutation.mutate(confirmUnpublishItem.id);
                         setConfirmUnpublishItem(null);
                     }
                 }}

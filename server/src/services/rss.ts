@@ -11,6 +11,7 @@ export const generateRssFeed = async () => {
         orderBy: { publishedAt: 'desc' },
     });
 
+    console.log(articles);
     const feed = new Feed({
         title: "Content Orchestrator Pro Feed",
         description: "Automated content derived from various sources.",

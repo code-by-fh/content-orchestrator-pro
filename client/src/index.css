@@ -100,6 +100,11 @@
     --ring: oklch(0.65 0.25 260);
 
     --radius: 0.75rem;
+
+    /* Scrollbar Variables - Dark */
+    --scrollbar-track: #1a1a1a;
+    --scrollbar-thumb: #4a4a4a;
+    --scrollbar-thumb-hover: #666666;
 }
 
 /* Light mode overrides (if strictly needed, but design calls for dark bias) */
@@ -131,6 +136,11 @@
     --border: oklch(0.90 0.02 260);
     --input: oklch(0.90 0.02 260);
     --ring: oklch(0.60 0.20 260);
+
+    /* Scrollbar Variables - Light */
+    --scrollbar-track: #f1f5f9;
+    --scrollbar-thumb: #cbd5e1;
+    --scrollbar-thumb-hover: #94a3b8;
 }
 
 @layer base {
@@ -172,5 +182,36 @@
     .no-scrollbar {
         -ms-overflow-style: none;
         scrollbar-width: none;
+    }
+
+    /* Fixed Scrollbar Styles - HARD FORCED visibility with Theme Support */
+    .custom-scrollbar::-webkit-scrollbar {
+        width: 10px !important;
+        height: 10px !important;
+        display: block !important;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-track {
+        background: var(--scrollbar-track) !important;
+        border-radius: 10px !important;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+        background: var(--scrollbar-thumb) !important;
+        border-radius: 10px !important;
+        border: 2px solid var(--scrollbar-track) !important;
+        background-clip: padding-box !important;
+        min-height: 40px !important;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+        background: var(--scrollbar-thumb-hover) !important;
+    }
+
+    .custom-scrollbar {
+        scrollbar-width: auto !important;
+        scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track) !important;
+        scrollbar-gutter: stable;
+        -webkit-overflow-scrolling: touch;
     }
 }
