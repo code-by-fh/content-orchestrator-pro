@@ -27,8 +27,10 @@ import {
     AlertCircle,
     Send,
     Zap,
-    MousePointer2
-
+    MousePointer2,
+    Linkedin,
+    Share2,
+    Globe
 } from 'lucide-react';
 
 import { Button } from './ui/Button';
@@ -264,20 +266,59 @@ export const ArticleEditor: React.FC = () => {
                     <div className="min-w-0 flex-1">
                         <h1 className="text-sm font-semibold text-foreground truncate max-w-[120px] md:max-w-md">{article.title}</h1>
                         <div className="flex items-center gap-2">
-                            <p className="text-[10px] text-muted-foreground flex items-center gap-1 whitespace-nowrap">
-                                <span className={cn("w-1.5 h-1.5 rounded-full", article.status === 'PUBLISHED' ? "bg-emerald-500" : article.status === 'SCHEDULED' ? "bg-blue-500" : "bg-amber-500")}></span>
-                                {article.status}
-                            </p>
-                            {article.status === 'SCHEDULED' && article.scheduledAt && (
-                                <button
-                                    onClick={() => setShowPublishModal(true)}
+                            <div className="flex items-center gap-1.5 shrink-0">
+                                <span className={cn(
+                                    "w-1.5 h-1.5 rounded-full shadow-[0_0_8px_rgba(0,0,0,0.2)]",
+                                    article.status === 'PUBLISHED' ? "bg-emerald-500" :
+                                        article.status === 'SCHEDULED' ? "bg-blue-500" :
+                                            "bg-amber-500"
+                                )}></span>
+                                <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-tight">
+                                    {article.status}
+                                </span>
+                            </div>
 
-                                    className="text-[10px] text-blue-400 hover:text-blue-300 flex items-center gap-1 hover:underline cursor-pointer whitespace-nowrap"
-                                >
-                                    <Calendar size={10} />
-                                    <span className="hidden sm:inline">{new Date(article.scheduledAt).toLocaleString()}</span>
-                                    <span className="sm:hidden">{new Date(article.scheduledAt).toLocaleDateString()}</span>
-                                </button>
+                            {/* Platform Icons for Published Content */}
+                            {article.publications && article.publications.some(p => p.status === 'PUBLISHED') && (
+                                <>
+                                    <div className="w-px h-3 bg-border/40 shrink-0" />
+                                    <div className="flex items-center gap-1">
+                                        {article.publications
+                                            .filter(p => p.status === 'PUBLISHED')
+                                            .map((pub) => {
+                                                const platform = pub.platform.toUpperCase();
+                                                return (
+                                                    <div
+                                                        key={pub.id}
+                                                        title={`Published on ${platform}`}
+                                                        className={cn(
+                                                            "p-1 rounded bg-muted/30 text-muted-foreground hover:text-foreground transition-colors shrink-0",
+                                                            platform === 'LINKEDIN' && "hover:text-[#0077b5]",
+                                                            platform === 'XING' && "hover:text-[#026466]",
+                                                            platform === 'RSS' && "hover:text-orange-500"
+                                                        )}
+                                                    >
+                                                        {platform === 'LINKEDIN' ? <Linkedin size={10} /> :
+                                                            platform === 'XING' ? <Share2 size={10} /> :
+                                                                platform === 'RSS' ? <Globe size={10} /> :
+                                                                    <UploadCloud size={10} />}
+                                                    </div>
+                                                );
+                                            })}
+                                    </div>
+                                </>
+                            )}
+                            {article.status === 'SCHEDULED' && article.scheduledAt && (
+                                <>
+                                    <div className="w-px h-3 bg-border/40 shrink-0" />
+                                    <button
+                                        onClick={() => setShowPublishModal(true)}
+                                        className="text-[10px] text-blue-400 hover:text-blue-300 flex items-center gap-1 hover:underline cursor-pointer font-medium shrink-0"
+                                    >
+                                        <Calendar size={10} />
+                                        <span>{new Date(article.scheduledAt).toLocaleString()}</span>
+                                    </button>
+                                </>
                             )}
                         </div>
                     </div>
