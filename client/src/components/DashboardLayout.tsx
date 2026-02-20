@@ -8,15 +8,19 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { CommandMenu } from './ui/CommandMenu';
 import logo from '../assets/orchestrator.svg';
 
-const NavItem = ({ to, icon: Icon, label, collapsed, onClick }: { to: string; icon: any; label: string; collapsed: boolean; onClick?: () => void }) => {
+const NavItem = ({ to, icon: Icon, label, collapsed, onClick, activePattern, end }: { to: string; icon: any; label: string; collapsed: boolean; onClick?: () => void; activePattern?: string; end?: boolean }) => {
+    const location = useLocation();
+    const isOverrideActive = activePattern ? location.pathname.startsWith(activePattern) : false;
+
     return (
         <NavLink
             to={to}
+            end={end}
             onClick={onClick}
             className={({ isActive }) =>
                 cn(
                     "flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group relative",
-                    isActive
+                    (isActive || isOverrideActive)
                         ? "bg-primary/10 text-primary"
                         : "text-muted-foreground hover:bg-accent hover:text-foreground"
                 )
@@ -136,8 +140,8 @@ export const DashboardLayout = () => {
                         {(!collapsed || isMobile) && <kbd className="text-[10px] border border-border rounded px-1.5 bg-background">⌘K</kbd>}
                     </button>
 
-                    <NavItem to="/dashboard" icon={LayoutDashboard} label="Dashboard" collapsed={collapsed && !isMobile} />
-                    <NavItem to="/dashboard/articles" icon={FileText} label="Articles" collapsed={collapsed && !isMobile} />
+                    <NavItem to="/dashboard" icon={LayoutDashboard} label="Dashboard" collapsed={collapsed && !isMobile} end />
+                    <NavItem to="/dashboard/articles" icon={FileText} label="Articles" collapsed={collapsed && !isMobile} activePattern="/dashboard/editor" />
                     <NavItem to="/dashboard/settings" icon={Settings} label="Settings" collapsed={collapsed && !isMobile} />
                 </div>
 
