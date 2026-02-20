@@ -10,19 +10,21 @@ import { RSSFeedCard } from './RSSFeedCard';
 import { cn } from '../lib/utils';
 
 export const DashboardOverview = () => {
-    const { data: articles, isLoading } = useQuery({
-        queryKey: ['articles'],
-        queryFn: getArticles,
+    const { data: paginatedArticles, isLoading } = useQuery({
+        queryKey: ['articles', 'dashboard-overview'],
+        queryFn: () => getArticles(1, 100), // Get a decent chunk for the dashboard
     });
 
+    const articles = paginatedArticles?.data || [];
+
     // Calculate stats
-    const totalArticles = articles?.length || 0;
-    const publishedCount = articles?.filter(a => a.status === 'PUBLISHED').length || 0;
-    const draftCount = articles?.filter(a => a.status !== 'PUBLISHED').length || 0;
+    const totalArticles = paginatedArticles?.meta?.total || 0;
+    const publishedCount = articles.filter(a => a.publications?.some(p => p.status === 'PUBLISHED')).length || 0;
+    const draftCount = articles.filter(a => !a.publications?.some(p => p.status === 'PUBLISHED') && !a.scheduledAt).length || 0;
 
     // Find next scheduled article
     const nextScheduledArticle = articles
-        ?.filter(a => a.status === 'SCHEDULED' && a.scheduledAt)
+        .filter(a => a.scheduledAt && !a.publications?.some(p => p.status === 'PUBLISHED'))
         .sort((a, b) => new Date(a.scheduledAt!).getTime() - new Date(b.scheduledAt!).getTime())[0];
 
     const stats = [
@@ -178,15 +180,17 @@ export const DashboardOverview = () => {
                                     <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
 
                                     <div className="flex justify-between items-start">
-                                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${article.status === 'PUBLISHED' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-indigo-500/10 text-indigo-500'
+                                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${article.publications?.some((p: any) => p.status === 'PUBLISHED') ? 'bg-emerald-500/10 text-emerald-500' : 'bg-indigo-500/10 text-indigo-500'
                                             }`}>
                                             <FileText size={18} />
                                         </div>
-                                        <div className={`text-[10px] px-2 py-0.5 rounded-full border ${article.status === 'PUBLISHED'
+                                        <div className={`text-[10px] px-2 py-0.5 rounded-full border ${article.publications?.some((p: any) => p.status === 'PUBLISHED')
                                             ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
-                                            : 'bg-amber-500/10 text-amber-600 border-amber-500/20'
+                                            : article.scheduledAt
+                                                ? 'bg-blue-500/10 text-blue-600 border-blue-500/20'
+                                                : 'bg-amber-500/10 text-amber-600 border-amber-500/20'
                                             }`}>
-                                            {article.status}
+                                            {article.publications?.some((p: any) => p.status === 'PUBLISHED') ? 'PUBLISHED' : article.scheduledAt ? 'SCHEDULED' : 'DRAFT'}
                                         </div>
                                     </div>
 

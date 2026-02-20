@@ -42,11 +42,47 @@ export const createContent = async (req: Request, res: Response) => {
 };
 
 export const getArticles = async (req: Request, res: Response) => {
-    const articles = await prisma.article.findMany({
-        orderBy: { createdAt: 'desc' },
-        include: { publications: true }
+    const page = Math.max(1, parseInt(req.query.page as string) || 1);
+    const limit = Math.max(1, parseInt(req.query.limit as string) || 10);
+    const search = req.query.search as string;
+    const publishedOnly = req.query.publishedOnly === 'true';
+
+    const where: any = {};
+    if (search) {
+        where.title = { contains: search };
+    }
+    if (publishedOnly) {
+        where.publications = {
+            some: { status: 'PUBLISHED' }
+        };
+    }
+
+    const [articles, total] = await Promise.all([
+        prisma.article.findMany({
+            where,
+            orderBy: { createdAt: 'desc' },
+            include: { publications: true },
+            skip: (page - 1) * limit,
+            take: limit
+        }),
+        prisma.article.count({ where })
+    ]);
+
+    const hasNextPage = (page * limit) < total;
+
+    // Artificial delay to make loading animations visible and prevent UI flickering
+    await new Promise(resolve => setTimeout(resolve, 800));
+
+    res.json({
+        data: articles,
+        meta: {
+            total,
+            page,
+            limit,
+            hasNextPage,
+            nextPage: hasNextPage ? page + 1 : null
+        }
     });
-    res.json(articles);
 };
 
 export const getArticle = async (req: Request, res: Response) => {

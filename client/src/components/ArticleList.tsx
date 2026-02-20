@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import React, { useState, useEffect } from 'react';
+import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useInView } from 'react-intersection-observer';
 import { getArticles, createArticle, deleteArticle, updateArticle, unpublishAllFromArticle } from '../api';
 import { Link } from 'react-router-dom';
 import { Plus, Youtube, FileText, Loader2, Clock, CheckCircle, Trash2, Calendar, Search, Filter } from 'lucide-react';
@@ -19,16 +20,40 @@ export const ArticleList: React.FC = () => {
     const [confirmUnpublishItem, setConfirmUnpublishItem] = useState<{ id: string } | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [showOnlyPublished, setShowOnlyPublished] = useState(false);
-    // Removed manual type selection state since it's now auto-detected
 
-    const { data: articles, isLoading } = useQuery({
-        queryKey: ['articles'],
-        queryFn: getArticles,
-        refetchInterval: () => {
-            // Revert to static interval or remove entirely since status is gone
-            return false;
-        }
+    // Add custom debounce hook logic
+    const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
+    useEffect(() => {
+        const handler = setTimeout(() => {
+            setDebouncedSearchQuery(searchQuery);
+        }, 300);
+        return () => clearTimeout(handler);
+    }, [searchQuery]);
+
+    const {
+        data,
+        isLoading,
+        fetchNextPage,
+        hasNextPage,
+        isFetchingNextPage
+    } = useInfiniteQuery({
+        queryKey: ['articles', debouncedSearchQuery, showOnlyPublished],
+        queryFn: ({ pageParam = 1 }) => getArticles(pageParam as number, 10, debouncedSearchQuery, showOnlyPublished),
+        getNextPageParam: (lastPage) => lastPage.meta.nextPage,
+        initialPageParam: 1,
     });
+
+    const { ref: inViewRef, inView } = useInView();
+
+    useEffect(() => {
+        if (inView && hasNextPage) {
+            fetchNextPage();
+        }
+    }, [inView, hasNextPage, fetchNextPage]);
+
+    const filteredArticles = data?.pages.flatMap(page => page.data) || [];
+    const articlesObject = data?.pages[0]; // just to check length if 0 later
+
 
     const createMutation = useMutation({
         mutationFn: (variables: { url: string, type: 'YOUTUBE' | 'MEDIUM' }) => createArticle(variables.url, variables.type),
@@ -79,13 +104,7 @@ export const ArticleList: React.FC = () => {
     });
 
 
-    // Filtering logic
-    const filteredArticles = articles?.filter(article => {
-        const matchesSearch = (article.title || '').toLowerCase().includes(searchQuery.toLowerCase());
-        const isPublished = article.publications?.some(pub => pub.status === 'PUBLISHED');
-        const matchesPublished = showOnlyPublished ? isPublished : true;
-        return matchesSearch && matchesPublished;
-    });
+
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -165,7 +184,7 @@ export const ArticleList: React.FC = () => {
             <div className="space-y-4">
                 <div className="flex items-center justify-between">
                     <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Your Library</h3>
-                    <span className="text-xs text-muted-foreground">{filteredArticles?.length || 0} of {articles?.length || 0} items</span>
+                    <span className="text-xs text-muted-foreground">{articlesObject?.meta?.total || 0} items</span>
                 </div>
 
                 {isLoading ? (
@@ -239,7 +258,25 @@ export const ArticleList: React.FC = () => {
                                 </motion.div>
                             ))}
                         </AnimatePresence>
-                        {articles?.length === 0 && (
+
+                        <AnimatePresence>
+                            {isFetchingNextPage && (
+                                <motion.div
+                                    initial={{ opacity: 0, height: 0 }}
+                                    animate={{ opacity: 1, height: 'auto' }}
+                                    exit={{ opacity: 0, height: 0 }}
+                                    className="space-y-3 py-2 w-full overflow-hidden"
+                                >
+                                    {[1, 2].map(i => (
+                                        <div key={`loading-${i}`} className="h-20 w-full bg-muted/50 rounded-xl animate-pulse" />
+                                    ))}
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+
+                        <div ref={inViewRef} className="h-4" />
+
+                        {filteredArticles.length === 0 && !isLoading && (
                             <motion.div
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}

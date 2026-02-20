@@ -34,8 +34,25 @@ export const getMe = async (): Promise<any> => {
     return response.data;
 };
 
-export const getArticles = async (): Promise<Article[]> => {
-    const response = await api.get('/content');
+export interface PaginatedArticles {
+    data: Article[];
+    meta: {
+        total: number;
+        page: number;
+        limit: number;
+        hasNextPage: boolean;
+        nextPage: number | null;
+    };
+}
+
+export const getArticles = async (page = 1, limit = 10, search = '', publishedOnly = false): Promise<PaginatedArticles> => {
+    const params = new URLSearchParams({
+        page: page.toString(),
+        limit: limit.toString(),
+        ...(search ? { search } : {}),
+        ...(publishedOnly ? { publishedOnly: 'true' } : {})
+    });
+    const response = await api.get(`/content?${params.toString()}`);
     return response.data;
 };
 
