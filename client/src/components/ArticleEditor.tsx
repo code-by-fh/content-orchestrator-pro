@@ -479,8 +479,6 @@ export const ArticleEditor: React.FC = () => {
                                     xingSummary={xingSummary} setXingSummary={setXingSummary}
                                     onClose={() => setShowInfoSidebar(false)}
                                     onShowTranscript={() => setShowTranscriptModal(true)}
-                                    onSave={handleSave}
-                                    isPending={updateMutation.isPending}
                                 />
                             </Panel>
                         </>
@@ -503,8 +501,6 @@ export const ArticleEditor: React.FC = () => {
                                     xingSummary={xingSummary} setXingSummary={setXingSummary}
                                     onClose={() => setShowInfoSidebar(false)}
                                     onShowTranscript={() => setShowTranscriptModal(true)}
-                                    onSave={handleSave}
-                                    isPending={updateMutation.isPending}
                                 />
                             </motion.div>
                         </div>
@@ -601,7 +597,7 @@ const InfoPanelContent = ({
     seoDescription, setSeoDescription,
     linkedinTeaser, setLinkedinTeaser,
     xingSummary, setXingSummary,
-    onClose, onShowTranscript, onSave, isPending
+    onClose, onShowTranscript
 }: any) => {
 
 
@@ -679,9 +675,6 @@ const InfoPanelContent = ({
                     </div>
                 </section>
 
-
-
-
                 {/* Action Buttons for Sidebar */}
                 <div className="pt-6 space-y-3 pb-8">
                     <Button
@@ -692,19 +685,13 @@ const InfoPanelContent = ({
                         <Code size={16} />
                         View Original Transcript
                     </Button>
-                    <Button
-                        className="w-full h-10 justify-start gap-3 shadow-md"
-                        onClick={onSave}
-                        disabled={isPending}
-                    >
-                        {isPending ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-                        Save All Changes
-                    </Button>
                 </div>
             </div>
         </>
     );
 };
+
+
 
 const PublishOptionsModal = ({
     isOpen,
