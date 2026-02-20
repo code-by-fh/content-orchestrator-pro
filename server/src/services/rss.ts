@@ -7,8 +7,19 @@ const md = new MarkdownIt();
 
 export const generateRssFeed = async () => {
     const articles = await prisma.article.findMany({
-        where: { status: 'PUBLISHED' },
-        orderBy: { publishedAt: 'desc' },
+        where: {
+            publications: {
+                some: { status: 'PUBLISHED' }
+            }
+        },
+        include: {
+            publications: {
+                where: { status: 'PUBLISHED' },
+                orderBy: { publishedAt: 'desc' },
+                take: 1
+            }
+        },
+        orderBy: { createdAt: 'desc' }, // Fallback sort, though ideally sorted by publication date
     });
 
     console.log(articles);
@@ -19,7 +30,7 @@ export const generateRssFeed = async () => {
         link: "http://localhost:3000/",
         language: "en", // or de
         copyright: "All rights reserved 2026",
-        updated: articles[0] ? articles[0].publishedAt || new Date() : new Date(),
+        updated: articles[0]?.publications[0]?.publishedAt || new Date(),
         generator: "Content Orchestrator Pro",
     });
 
@@ -32,7 +43,7 @@ export const generateRssFeed = async () => {
             link: `http://localhost:5173/articles/${article.id}`, // Link to frontend
             description: article.linkedinTeaser || article.title,
             content: htmlContent,
-            date: article.publishedAt || article.createdAt,
+            date: article.publications[0]?.publishedAt || article.createdAt,
         });
     });
 

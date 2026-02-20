@@ -29,7 +29,6 @@ export const createContent = async (req: Request, res: Response) => {
                 slug: slug,
                 sourceUrl: url,
                 rawTranscript: '',
-                status: 'QUEUED',
             },
         });
 
@@ -45,6 +44,7 @@ export const createContent = async (req: Request, res: Response) => {
 export const getArticles = async (req: Request, res: Response) => {
     const articles = await prisma.article.findMany({
         orderBy: { createdAt: 'desc' },
+        include: { publications: true }
     });
     res.json(articles);
 };
@@ -153,34 +153,31 @@ export const deleteArticle = async (req: Request, res: Response) => {
 
 export const updateArticle = async (req: Request, res: Response) => {
     const { id } = req.params;
-    const { title, markdownContent, status, scheduledAt } = req.body;
+    const { title, markdownContent, status: reqStatus, scheduledAt } = req.body;
 
     try {
         const updateData: any = {};
 
         if (title !== undefined) updateData.title = title;
         if (markdownContent !== undefined) updateData.markdownContent = markdownContent;
-        if (status !== undefined) updateData.status = status;
         if (req.body.seoTitle !== undefined) updateData.seoTitle = req.body.seoTitle;
         if (req.body.seoDescription !== undefined) updateData.seoDescription = req.body.seoDescription;
         if (req.body.linkedinTeaser !== undefined) updateData.linkedinTeaser = req.body.linkedinTeaser;
         if (req.body.xingSummary !== undefined) updateData.xingSummary = req.body.xingSummary;
 
         // Handle scheduled publishing
-        if (status === 'SCHEDULED' && scheduledAt) {
+        if (reqStatus === 'SCHEDULED' && scheduledAt) {
             updateData.scheduledAt = new Date(scheduledAt);
         }
 
         // Handle immediate publishing
-        if (status === 'PUBLISHED') {
-            updateData.publishedAt = new Date();
+        if (reqStatus === 'PUBLISHED') {
             updateData.scheduledAt = null; // Clear scheduled time if publishing now
         }
 
-        // Handle unpublish/cancel: clear both dates when reverting to DRAFT
-        if (status === 'DRAFT') {
+        // Handle unpublish/cancel: clear scheduled date when reverting to DRAFT
+        if (reqStatus === 'DRAFT') {
             updateData.scheduledAt = null;
-            updateData.publishedAt = null;
         }
 
         // Handle explicit scheduledAt clearing (empty string from frontend)

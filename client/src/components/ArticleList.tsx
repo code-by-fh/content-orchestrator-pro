@@ -2,29 +2,20 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getArticles, createArticle, deleteArticle, updateArticle, unpublishAllFromArticle } from '../api';
 import { Link } from 'react-router-dom';
-import { Plus, Youtube, FileText, Loader2, Clock, CheckCircle, AlertCircle, RefreshCw, Trash2, Calendar, Search, Filter } from 'lucide-react';
+import { Plus, Youtube, FileText, Loader2, Clock, CheckCircle, Trash2, Calendar, Search, Filter } from 'lucide-react';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
 import { cn } from '../lib/utils';
-import type { ArticleStatus } from '../types';
+// import type { ArticleStatus } from '../types';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ConfirmationModal } from './ui/ConfirmationModal';
 
-const StatusIndicator = ({ status }: { status: ArticleStatus }) => {
-    switch (status) {
-        case 'COMPLETED': return <CheckCircle size={16} className="text-emerald-500" />;
-        case 'PROCESSING': return <RefreshCw size={16} className="text-indigo-500 animate-spin" />;
-        case 'SCHEDULED': return <Calendar size={16} className="text-blue-500" />;
-        case 'ERROR': return <AlertCircle size={16} className="text-red-500" />;
-        default: return <Clock size={16} className="text-muted-foreground" />;
-    }
-};
 
 export const ArticleList: React.FC = () => {
     const queryClient = useQueryClient();
     const [url, setUrl] = useState('');
-    const [confirmDeleteItem, setConfirmDeleteItem] = useState<{ id: string, status: ArticleStatus } | null>(null);
+    const [confirmDeleteItem, setConfirmDeleteItem] = useState<{ id: string, isPublished: boolean, isScheduled: boolean } | null>(null);
     const [confirmUnpublishItem, setConfirmUnpublishItem] = useState<{ id: string } | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [showOnlyPublished, setShowOnlyPublished] = useState(false);
@@ -33,9 +24,9 @@ export const ArticleList: React.FC = () => {
     const { data: articles, isLoading } = useQuery({
         queryKey: ['articles'],
         queryFn: getArticles,
-        refetchInterval: (query) => {
-            const hasActiveJobs = query.state.data?.some(a => a.status === 'PROCESSING' || a.status === 'QUEUED');
-            return hasActiveJobs ? 3000 : false;
+        refetchInterval: () => {
+            // Revert to static interval or remove entirely since status is gone
+            return false;
         }
     });
 
@@ -66,7 +57,7 @@ export const ArticleList: React.FC = () => {
     });
 
     const updateMutation = useMutation({
-        mutationFn: (variables: { id: string, status: ArticleStatus }) => updateArticle(variables.id, { status: variables.status }),
+        mutationFn: (variables: { id: string, status: string }) => updateArticle(variables.id, { status: variables.status }),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['articles'] });
             toast.success("Article updated successfully");
@@ -91,7 +82,8 @@ export const ArticleList: React.FC = () => {
     // Filtering logic
     const filteredArticles = articles?.filter(article => {
         const matchesSearch = (article.title || '').toLowerCase().includes(searchQuery.toLowerCase());
-        const matchesPublished = showOnlyPublished ? article.status === 'PUBLISHED' : true;
+        const isPublished = article.publications?.some(pub => pub.status === 'PUBLISHED');
+        const matchesPublished = showOnlyPublished ? isPublished : true;
         return matchesSearch && matchesPublished;
     });
 
@@ -210,7 +202,7 @@ export const ArticleList: React.FC = () => {
                                                 <div className="min-w-0 flex-1">
                                                     <h4 className="font-semibold text-foreground truncate group-hover:text-indigo-400 transition-colors">{article.title || 'Untitled Article'}</h4>
                                                     <p className="text-xs text-muted-foreground truncate">{article.slug || 'Processing...'}</p>
-                                                    {article.status === 'SCHEDULED' && article.scheduledAt && (
+                                                    {article.scheduledAt && !article.publications?.some(pub => pub.status === 'PUBLISHED') && (
                                                         <p className="text-[10px] text-blue-400 flex items-center gap-1 mt-0.5">
                                                             <Calendar size={10} />
                                                             Scheduled: {new Date(article.scheduledAt).toLocaleString()}
@@ -221,8 +213,13 @@ export const ArticleList: React.FC = () => {
 
                                             <div className="flex items-center justify-between w-full md:w-auto md:justify-end gap-4 pl-0 md:pl-4 mt-4 md:mt-0 border-t md:border-t-0 border-white/5 pt-4 md:pt-0 shrink-0">
                                                 <div className="flex items-center gap-2 text-xs font-medium bg-secondary/50 px-2.5 py-1 rounded-full border border-white/5">
-                                                    <StatusIndicator status={article.status} />
-                                                    <span className="capitalize">{article.status.toLowerCase()}</span>
+                                                    {article.publications?.some(pub => pub.status === 'PUBLISHED') ? (
+                                                        <><CheckCircle size={16} className="text-emerald-500" /><span className="capitalize">Published</span></>
+                                                    ) : article.scheduledAt ? (
+                                                        <><Calendar size={16} className="text-blue-500" /><span className="capitalize">Scheduled</span></>
+                                                    ) : (
+                                                        <><Clock size={16} className="text-muted-foreground" /><span className="capitalize">Draft</span></>
+                                                    )}
                                                 </div>
                                                 <div className="flex items-center gap-4 text-xs text-muted-foreground">
                                                     <span className="hidden sm:inline">
@@ -230,7 +227,7 @@ export const ArticleList: React.FC = () => {
                                                     </span>
                                                     <ArticleActions
                                                         article={article}
-                                                        onDelete={() => setConfirmDeleteItem({ id: article.id, status: article.status })}
+                                                        onDelete={() => setConfirmDeleteItem({ id: article.id, isPublished: !!article.publications?.some(pub => pub.status === 'PUBLISHED'), isScheduled: !!article.scheduledAt })}
                                                         onUnpublish={(id) => setConfirmUnpublishItem({ id })}
                                                         isUnpublishing={unpublishMutation.isPending && unpublishMutation.variables === article.id}
 
@@ -267,7 +264,7 @@ export const ArticleList: React.FC = () => {
                 }}
                 title="Delete Article"
                 description={
-                    confirmDeleteItem?.status === 'PUBLISHED' || confirmDeleteItem?.status === 'SCHEDULED'
+                    confirmDeleteItem?.isPublished || confirmDeleteItem?.isScheduled
                         ? "This article is currently live or scheduled. Deleting it will also UNPUBLISH it from all platforms. Are you sure?"
                         : "Are you sure you want to delete this article? This action cannot be undone."
                 }
@@ -300,7 +297,7 @@ const ArticleActions = ({ article, onDelete, onUnpublish, isUnpublishing }: { ar
 
     return (
         <div className="flex items-center gap-1">
-            {article.status === 'PUBLISHED' && (
+            {article.publications?.some((pub: any) => pub.status === 'PUBLISHED') && (
                 <Button
                     variant="ghost"
                     size="icon"

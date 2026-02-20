@@ -62,17 +62,6 @@ class PublishingService {
                 }
             });
 
-            // If article was a draft, mark it as published now that it's live on at least one platform
-            if (article.status === 'DRAFT' || article.status === 'COMPLETED' || article.status === 'SCHEDULED') {
-                await prisma.article.update({
-                    where: { id: articleId },
-                    data: {
-                        status: 'PUBLISHED',
-                        publishedAt: new Date(),
-                        scheduledAt: null
-                    }
-                });
-            }
         } else {
             await prisma.publication.update({
                 where: { articleId_platform: { articleId, platform } },

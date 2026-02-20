@@ -7,20 +7,22 @@ export class RssAdapter implements PlatformAdapter {
     couldAutoPublish = true;
 
     async publish(article: Article): Promise<PublishResult> {
-        console.log(`[RssAdapter] Adding article to RSS feed: ${article.title}`);
+        // Since our RSS feed is dynamically generated from articles with status 'PUBLISHED',
+        // 'publishing' to RSS simply means confirming it should be visible there.
+        // The PublishingService will handle the status transition.
 
-        return new Promise((resolve) => {
-            setTimeout(() => {
-                resolve({
-                    success: true,
-                    platformId: `rss_${article.slug || Date.now()}`
-                });
-            }, 800);
-        });
+        console.log(`[RssAdapter] Article "${article.title}" is now eligible for the RSS feed.`);
+
+        return {
+            success: true,
+            platformId: article.slug || article.id
+        };
     }
 
     async unpublish(articleId: string, platformId: string, accessToken?: string): Promise<boolean> {
-        console.log(`[RssAdapter] Simulating removal from RSS for: ${platformId}`);
+        // Unpublishing from RSS is handled by changing the article status or deleting the publication record.
+        console.log(`[RssAdapter] Article with ID ${articleId} removed from RSS eligibility.`);
         return true;
     }
 }
+

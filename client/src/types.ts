@@ -1,4 +1,3 @@
-export type ArticleStatus = 'DRAFT' | 'QUEUED' | 'PROCESSING' | 'COMPLETED' | 'SCHEDULED' | 'PUBLISHED' | 'ERROR';
 
 export type Platform = 'XING' | 'LINKEDIN' | 'MEDIUM' | 'RSS';
 
@@ -30,9 +29,8 @@ export interface Article {
     xingSummary?: string;
     seoTitle?: string;
     seoDescription?: string;
-    status: ArticleStatus;
+
     scheduledAt?: string;
-    publishedAt?: string;
     createdAt: string;
     publications: Publication[];
     availablePlatforms?: AvailablePlatform[];

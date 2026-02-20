@@ -102,14 +102,14 @@ export const ArticleEditor: React.FC = () => {
     }, [article]);
 
     const updateMutation = useMutation({
-        mutationFn: (data: Partial<Article>) => updateArticle(id!, data),
-        onSuccess: (data) => {
+        mutationFn: (data: Partial<Article> & { status?: string }) => updateArticle(id!, data),
+        onSuccess: (data, variables) => {
             queryClient.invalidateQueries({ queryKey: ['article', id] });
-            if (data.status === 'PUBLISHED') {
+            if (variables.status === 'PUBLISHED') {
                 toast.success('Article published successfully!');
-            } else if (data.status === 'SCHEDULED') {
+            } else if (variables.status === 'SCHEDULED') {
                 toast.success('Article scheduled successfully!');
-            } else if (data.status === 'DRAFT') {
+            } else if (variables.status === 'DRAFT') {
                 toast.success('Article unpublished (Draft).');
             } else {
                 toast.success('Changes saved successfully!');
@@ -266,16 +266,8 @@ export const ArticleEditor: React.FC = () => {
                     <div className="min-w-0 flex-1">
                         <h1 className="text-sm font-semibold text-foreground truncate max-w-[120px] md:max-w-md">{article.title}</h1>
                         <div className="flex items-center gap-2">
-                            <div className="flex items-center gap-1.5 shrink-0">
-                                <span className={cn(
-                                    "w-1.5 h-1.5 rounded-full shadow-[0_0_8px_rgba(0,0,0,0.2)]",
-                                    article.status === 'PUBLISHED' ? "bg-emerald-500" :
-                                        article.status === 'SCHEDULED' ? "bg-blue-500" :
-                                            "bg-amber-500"
-                                )}></span>
-                                <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-tight">
-                                    {article.status}
-                                </span>
+                            <div className="text-[10px] uppercase font-bold text-muted-foreground tracking-tight">
+                                {article.publications?.some((p: any) => p.status === 'PUBLISHED') ? 'PUBLISHED' : article.scheduledAt ? 'SCHEDULED' : 'DRAFT'}
                             </div>
 
                             {/* Platform Icons for Published Content */}
@@ -308,7 +300,7 @@ export const ArticleEditor: React.FC = () => {
                                     </div>
                                 </>
                             )}
-                            {article.status === 'SCHEDULED' && article.scheduledAt && (
+                            {article.scheduledAt && !article.publications?.some((p: any) => p.status === 'PUBLISHED') && (
                                 <>
                                     <div className="w-px h-3 bg-border/40 shrink-0" />
                                     <button
@@ -386,7 +378,7 @@ export const ArticleEditor: React.FC = () => {
                             className="bg-primary text-primary-foreground shadow-lg shadow-indigo-500/20 hover:bg-primary/90 gap-2 px-3 md:px-4"
                         >
                             {updateMutation.isPending ? <Loader2 className="animate-spin w-4 h-4" /> : <UploadCloud size={16} />}
-                            <span className="hidden md:inline">{article.status === 'PUBLISHED' ? 'Update' : 'Publish'}</span>
+                            <span className="hidden md:inline">{article.publications?.some((p: any) => p.status === 'PUBLISHED') ? 'Update' : 'Publish'}</span>
                         </Button>
                     </motion.div>
                 </div>
@@ -623,7 +615,7 @@ export const ArticleEditor: React.FC = () => {
                 scheduledAt={article?.scheduledAt}
                 sourceUrl={article?.sourceUrl}
                 onUnpublish={() => setShowUnpublishConfirm(true)}
-                status={article?.status}
+                status={article?.publications?.some((p: any) => p.status === 'PUBLISHED') ? 'PUBLISHED' : article?.scheduledAt ? 'SCHEDULED' : 'DRAFT'}
             />
 
 

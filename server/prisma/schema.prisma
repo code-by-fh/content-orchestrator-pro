@@ -13,24 +13,12 @@ model User {
   passwordHash String
 }
 
-enum ArticleStatus {
-  DRAFT
-  QUEUED
-  PROCESSING
-  COMPLETED
-  SCHEDULED
-  PUBLISHED
-  ERROR
-}
-
 enum Platform {
   XING
   LINKEDIN
   MEDIUM
   RSS
 }
-
-
 
 enum PublicationStatus {
   PENDING
@@ -39,21 +27,21 @@ enum PublicationStatus {
 }
 
 model Article {
-  id             String        @id @default(uuid())
-  title          String
-  slug           String        @unique
-  sourceUrl      String
-  rawTranscript  String        @db.Text
-  markdownContent String?      @db.Text
-  linkedinTeaser String?       @db.Text
-  xingSummary    String?       @db.Text
-  status         ArticleStatus @default(DRAFT)
+  id              String  @id @default(uuid())
+  title           String
+  slug            String  @unique
+  sourceUrl       String
+  rawTranscript   String  @db.Text
+  markdownContent String? @db.Text
+  linkedinTeaser  String? @db.Text
+  xingSummary     String? @db.Text
+
   seoTitle       String?
-  seoDescription String?       @db.Text
+  seoDescription String?   @db.Text
   scheduledAt    DateTime?
-  publishedAt    DateTime?
-  createdAt      DateTime      @default(now())
-  publications   Publication[]
+
+  createdAt    DateTime      @default(now())
+  publications Publication[]
 }
 
 model Publication {
@@ -62,7 +50,7 @@ model Publication {
   article      Article           @relation(fields: [articleId], references: [id])
   platform     Platform
   status       PublicationStatus @default(PENDING)
-  platformId   String?           // ID assigned by the platform (e.g., ActivityID)
+  platformId   String? // ID assigned by the platform (e.g., ActivityID)
   errorMessage String?           @db.Text
   publishedAt  DateTime?
   createdAt    DateTime          @default(now())
@@ -70,4 +58,3 @@ model Publication {
 
   @@unique([articleId, platform])
 }
-

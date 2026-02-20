@@ -1,3 +1,4 @@
+import axios from 'axios';
 import { Article, Platform } from '@prisma/client';
 import { PlatformAdapter, PublishResult } from './types';
 
@@ -7,17 +8,55 @@ export class MediumAdapter implements PlatformAdapter {
     couldAutoPublish = true;
 
     async publish(article: Article, accessToken?: string): Promise<PublishResult> {
-        console.log(`[MediumAdapter] Simulating posting for: ${article.title}`);
+        if (!accessToken) {
+            return { success: false, error: 'Medium requires an integration token.' };
+        }
 
-        return new Promise((resolve) => {
-            setTimeout(() => {
-                resolve({ success: true, platformId: `med_${Date.now()}` });
-            }, 1200);
-        });
+        if (!article.markdownContent) {
+            return { success: false, error: 'Article has no content to publish.' };
+        }
+
+        try {
+            // 1. Get User ID
+            const meResponse = await axios.get('https://api.medium.com/v1/me', {
+                headers: { Authorization: `Bearer ${accessToken}` }
+            });
+
+            const authorId = meResponse.data.data.id;
+
+            // 2. Post content
+            const postResponse = await axios.post(
+                `https://api.medium.com/v1/users/${authorId}/posts`,
+                {
+                    title: article.title,
+                    contentFormat: 'markdown',
+                    content: article.markdownContent,
+                    canonicalUrl: article.sourceUrl,
+                    publishStatus: 'public'
+                },
+                {
+                    headers: { Authorization: `Bearer ${accessToken}` }
+                }
+            );
+
+            return {
+                success: true,
+                platformId: postResponse.data.data.id
+            };
+        } catch (error: any) {
+            const errorData = error.response?.data || error.message;
+            console.error('[MediumAdapter] Error:', errorData);
+            return {
+                success: false,
+                error: typeof errorData === 'string' ? errorData : JSON.stringify(errorData)
+            };
+        }
     }
 
     async unpublish(articleId: string, platformId: string, accessToken?: string): Promise<boolean> {
-        console.log(`[MediumAdapter] Simulating unpublishing for: ${platformId}`);
-        return true;
+        // Medium API does not officially support unpublishing via their public API v1
+        console.warn('[MediumAdapter] Unpublishing not supported by Medium API v1');
+        return false;
     }
 }
+

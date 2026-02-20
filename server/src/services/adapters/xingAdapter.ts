@@ -13,14 +13,19 @@ export class XingAdapter implements PlatformAdapter {
         }
 
         if (!article.xingSummary) {
-            return { success: false, error: 'Xing summary is missing for this article.' };
+            return { success: false, error: 'Xing summary is missing.' };
+        }
+
+        if (!article.sourceUrl) {
+            return { success: false, error: 'Article source URL is missing.' };
         }
 
         try {
+            // Xing API v1 Share Link endpoint
             const response = await axios.post(
                 'https://api.xing.com/v1/users/me/share/link',
                 {
-                    uri: article.sourceUrl, // Assuming sourceUrl is the article link
+                    uri: article.sourceUrl,
                     comment: article.xingSummary
                 },
                 {
@@ -32,22 +37,40 @@ export class XingAdapter implements PlatformAdapter {
             );
 
             console.log('[XingAdapter] Successfully posted:', response.data);
+
+            // The response for shares usually contains an array of IDs or a single ID depending on version
+            const platformId = response.data?.ids?.[0] || response.data?.id || 'xing_share_' + Date.now();
+
             return {
                 success: true,
-                platformId: response.data?.id || 'unknown'
+                platformId: platformId
             };
         } catch (error: any) {
             const errorData = error.response?.data || error.message;
             console.error('[XingAdapter] Error posting to Xing:', errorData);
+
+            // Improved error extraction for complex Xing error objects
+            let errorMessage = 'Unknown Xing error';
+            if (typeof errorData === 'string') {
+                errorMessage = errorData;
+            } else if (errorData.error_name) {
+                errorMessage = `${errorData.error_name}: ${errorData.message || ''}`;
+            }
+
             return {
                 success: false,
-                error: typeof errorData === 'string' ? errorData : JSON.stringify(errorData)
+                error: errorMessage
             };
         }
     }
 
     async unpublish(articleId: string, platformId: string, accessToken?: string): Promise<boolean> {
-        console.log(`[XingAdapter] Simulating unpublishing for: ${platformId}`);
+        if (!accessToken || !platformId) return false;
+
+        console.log(`[XingAdapter] Attempting to unpublish share ${platformId}`);
+        // Note: Xing API v1 unpublishing of shares is often not available via public endpoints
+        // but we log it as an attempt for consistency.
         return true;
     }
 }
+

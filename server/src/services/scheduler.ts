@@ -14,7 +14,7 @@ export const initScheduler = () => {
 
             const articlesToPublish = await prisma.article.findMany({
                 where: {
-                    status: 'SCHEDULED',
+                    // status removed, relying on scheduledAt
                     scheduledAt: {
                         lte: now,
                     },
@@ -30,8 +30,7 @@ export const initScheduler = () => {
                 const updatedArticle = await prisma.article.update({
                     where: { id: article.id },
                     data: {
-                        status: 'PUBLISHED',
-                        publishedAt: now,
+                        scheduledAt: null,
                     },
                 });
 

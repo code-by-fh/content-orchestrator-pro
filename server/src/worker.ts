@@ -103,10 +103,7 @@ const worker = new Worker('content-queue', async (job: Job) => {
     const { articleId, type, sourceUrl } = job.data;
 
     try {
-        await prisma.article.update({
-            where: { id: articleId },
-            data: { status: 'PROCESSING' },
-        });
+        // Status processing removed
 
         let rawText = '';
 
@@ -141,17 +138,13 @@ const worker = new Worker('content-queue', async (job: Job) => {
                 seoTitle: validatedData.seoTitle,
                 seoDescription: validatedData.seoDescription,
                 slug: validatedData.slug,
-                status: 'COMPLETED',
                 rawTranscript: rawText
             },
         });
 
     } catch (error: any) {
         console.error(`Job failed: ${error.message}`);
-        await prisma.article.update({
-            where: { id: articleId },
-            data: { status: 'ERROR' },
-        }).catch(() => { });
+        console.error(`Status update to ERROR for ${articleId} removed due to schema change`);
         throw error;
     }
 }, {

@@ -53,7 +53,7 @@ export const deleteArticle = async (id: string): Promise<void> => {
     await api.delete(`/content/${id}`);
 };
 
-export const updateArticle = async (id: string, data: Partial<Article>): Promise<Article> => {
+export const updateArticle = async (id: string, data: Partial<Article> & { status?: string }): Promise<Article> => {
     const response = await api.put(`/content/${id}`, data);
     return response.data;
 };
