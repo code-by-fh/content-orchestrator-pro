@@ -71,11 +71,11 @@ async function generateArticleContent(rawText: string): Promise<ValidatedArticle
             - Achte auf korrekte Fachbegriffe
             - Erkläre komplexe Konzepte verständlich
             - Füge relevante Code-Beispiele nur ein wenn sie einen echten Mehrwert bieten
-            - Generiere und füge relevante Bilder nur ein, wenn sie einen echten Mehrwert bieten
+            - Generiere und füge KI-Prompts für Bilder nur ein, wenn sie einen Mehrwert für den Artikel bieten
             - Strukturiere den Text logisch und lesefreundlich
             - Vermeide Wiederholungen
             - Halte dich an die deutsche Sprache
-            - Für alle Fakten und Behauptungen MUSS ein Nachweis dem Text hinzugefügt werden! Der Nachweis soll durch eckige Klammern [1] markiert sein. Der Nachweis wird am Ende des Textes in einer Liste aufgeführt.
+            - Für alle Fakten und Behauptungen MUSS ein Nachweis dem Text hinzugefügt werden! Der Nachweis soll durch eckige Klammern [1] markiert sein. Alle Nachweise werden am Ende des Textes in einer sauberen Markdown-Liste (Aufzählung untereinander) aufgeführt.
             
             Input:
             {rawText}

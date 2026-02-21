@@ -652,7 +652,7 @@ export const ArticleEditor: React.FC = () => {
                                             onScroll={handlePreviewScroll}
                                             className="h-full overflow-y-scroll custom-scrollbar"
                                         >
-                                            <div className="max-w-2xl mx-auto py-8 md:py-12 px-4 md:px-8
+                                            <div className="max-w-5xl mx-auto py-8 md:py-12 px-4 md:px-8
                                                 prose prose-slate dark:prose-invert
                                                 text-foreground/80 dark:text-gray-100
                                                 dark:prose-headings:text-white
@@ -668,6 +668,7 @@ export const ArticleEditor: React.FC = () => {
                                                             if (!props.src) return <span className="inline-flex items-center gap-2 text-muted-foreground italic text-sm animate-pulse"><Loader2 size={14} className="animate-spin" /> Uploading image...</span>;
                                                             return <img {...props} className="rounded-xl border border-border/40 shadow-lg my-8" />;
                                                         },
+                                                        li: ({ node, ...props }) => <li {...props} className="block mb-2" />,
                                                         code(props) {
                                                             const { children, className, node, ref, ...rest } = props
                                                             const match = /language-(\w+)/.exec(className || '')

@@ -294,7 +294,7 @@ export const uploadImage = async (req: Request, res: Response) => {
         }
 
         const fileName = req.file.filename;
-        const baseUrl = process.env.PUBLIC_ARTICLE_BASE_URL || `${req.protocol}://${req.get('host')}`;
+        const baseUrl = process.env.BACKEND_URL || `${req.protocol}://${req.get('host')}`;
         const imageUrl = `${baseUrl}/uploads/${fileName}`;
 
         res.json({ imageUrl });
