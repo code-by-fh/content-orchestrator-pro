@@ -2,7 +2,7 @@ import axios from 'axios';
 import type { Article } from './types';
 
 const api = axios.create({
-    baseURL: 'http://localhost:3000/api', // Should be env variable
+    baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3003/api',
 });
 
 api.interceptors.request.use((config) => {

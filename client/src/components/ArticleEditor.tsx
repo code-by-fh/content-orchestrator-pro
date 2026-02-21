@@ -353,13 +353,15 @@ export const ArticleEditor: React.FC = () => {
                                                             "p-1 rounded bg-muted/30 text-muted-foreground hover:text-foreground transition-colors shrink-0",
                                                             platform === 'LINKEDIN' && "hover:text-[#0077b5]",
                                                             platform === 'XING' && "hover:text-[#026466]",
-                                                            platform === 'RSS' && "hover:text-orange-500"
+                                                            platform === 'RSS' && "hover:text-orange-500",
+                                                            platform === 'WEBHOOK' && "hover:text-blue-500"
                                                         )}
                                                     >
                                                         {platform === 'LINKEDIN' ? <Linkedin size={10} /> :
                                                             platform === 'XING' ? <Share2 size={10} /> :
                                                                 platform === 'RSS' ? <Globe size={10} /> :
-                                                                    <UploadCloud size={10} />}
+                                                                    platform === 'WEBHOOK' ? <Globe size={10} /> :
+                                                                        <UploadCloud size={10} />}
                                                     </div>
                                                 );
                                             })}

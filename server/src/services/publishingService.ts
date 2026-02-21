@@ -4,6 +4,7 @@ import { XingAdapter } from './adapters/xingAdapter';
 import { LinkedInAdapter } from './adapters/linkedinAdapter';
 import { RssAdapter } from './adapters/rssAdapter';
 import { MediumAdapter } from './adapters/mediumAdapter';
+import { WebhookAdapter } from './adapters/webhookAdapter';
 
 const prisma = new PrismaClient();
 
@@ -15,6 +16,7 @@ class PublishingService {
         this.registerAdapter(new LinkedInAdapter());
         this.registerAdapter(new RssAdapter());
         this.registerAdapter(new MediumAdapter());
+        this.registerAdapter(new WebhookAdapter());
     }
 
     private registerAdapter(adapter: PlatformAdapter) {

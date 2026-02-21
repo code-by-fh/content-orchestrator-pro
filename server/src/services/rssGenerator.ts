@@ -25,8 +25,8 @@ export const generateRssFeed = async () => {
     const feed = new Feed({
         title: "Content Orchestrator Pro Feed",
         description: "Automated content derived from various sources.",
-        id: process.env.BACKEND_URL || "http://localhost:3000/",
-        link: process.env.BACKEND_URL || "http://localhost:3000/",
+        id: process.env.BACKEND_URL || "http://localhost:3003/",
+        link: process.env.BACKEND_URL || "http://localhost:3003/",
         language: "en",
         copyright: "All rights reserved 2026",
         updated: articles[0]?.publications[0]?.publishedAt || new Date(),

@@ -10,7 +10,12 @@ export const RSSFeedCard = () => {
     // In a real app, this might come from env or config
     // Assuming backend runs on same host/port 3000 for API based on generic setup
     // But currently frontend is usually 5173 and backend 3000
-    const feedUrl = "http://localhost:3000/api/rss";
+    const getRssUrl = () => {
+        const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:3003/api";
+        // Ensure it ends with /rss and handle potential double slashes
+        return `${apiUrl.replace(/\/$/, '')}/rss`;
+    };
+    const feedUrl = getRssUrl();
 
     const handleCopy = () => {
         navigator.clipboard.writeText(feedUrl);

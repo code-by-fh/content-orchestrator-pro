@@ -1,5 +1,5 @@
 
-export type Platform = 'XING' | 'LINKEDIN' | 'MEDIUM' | 'RSS';
+export type Platform = 'XING' | 'LINKEDIN' | 'MEDIUM' | 'RSS' | 'WEBHOOK';
 
 export type PublicationStatus = 'PENDING' | 'PUBLISHED' | 'ERROR';
 

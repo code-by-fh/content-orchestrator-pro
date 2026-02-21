@@ -18,6 +18,7 @@ enum Platform {
   LINKEDIN
   MEDIUM
   RSS
+  WEBHOOK
 }
 
 enum PublicationStatus {
