@@ -69,6 +69,7 @@ export const ArticleEditor: React.FC = () => {
 
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const previewRef = useRef<HTMLDivElement>(null);
+    const isScrollingRef = useRef<boolean>(false);
 
     const { data: article, isLoading } = useQuery({
         queryKey: ['article', id],
@@ -238,14 +239,43 @@ export const ArticleEditor: React.FC = () => {
         }, 0);
     };
 
-    const handleScroll = (e: React.UIEvent<HTMLTextAreaElement>) => {
+    const handleEditorScroll = (e: React.UIEvent<HTMLTextAreaElement>) => {
+        if (isScrollingRef.current) return;
         if (!textareaRef.current || !previewRef.current) return;
+
         const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
-        const scrollRatio = scrollTop / (scrollHeight - clientHeight);
+        const maxScroll = scrollHeight - clientHeight;
+        if (maxScroll <= 0) return;
+
+        isScrollingRef.current = true;
+        const scrollRatio = scrollTop / maxScroll;
+
         const preview = previewRef.current;
-        if (preview.scrollHeight > preview.clientHeight) {
-            preview.scrollTop = scrollRatio * (preview.scrollHeight - preview.clientHeight);
-        }
+        preview.scrollTop = scrollRatio * (preview.scrollHeight - preview.clientHeight);
+
+        // Reset the flag after a short delay to avoid feedback loops
+        setTimeout(() => {
+            isScrollingRef.current = false;
+        }, 10);
+    };
+
+    const handlePreviewScroll = (e: React.UIEvent<HTMLDivElement>) => {
+        if (isScrollingRef.current) return;
+        if (!textareaRef.current || !previewRef.current) return;
+
+        const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
+        const maxScroll = scrollHeight - clientHeight;
+        if (maxScroll <= 0) return;
+
+        isScrollingRef.current = true;
+        const scrollRatio = scrollTop / maxScroll;
+
+        const textarea = textareaRef.current;
+        textarea.scrollTop = scrollRatio * (textarea.scrollHeight - textarea.clientHeight);
+
+        setTimeout(() => {
+            isScrollingRef.current = false;
+        }, 10);
     };
 
     if (isLoading) return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin text-primary" /></div>;
@@ -415,11 +445,11 @@ export const ArticleEditor: React.FC = () => {
                                             </div>
                                             <textarea
                                                 ref={textareaRef}
-                                                onScroll={handleScroll}
+                                                onScroll={handleEditorScroll}
                                                 value={content}
                                                 onChange={(e) => setContent(e.target.value)}
                                                 placeholder="Start writing your masterpiece..."
-                                                className="flex-1 w-full p-4 md:p-8 resize-none bg-transparent focus:outline-none font-mono text-sm leading-relaxed text-foreground/80 placeholder:text-muted-foreground/30 scroll-smooth selection:bg-indigo-500/20 custom-scrollbar"
+                                                className="flex-1 w-full p-4 md:p-8 resize-none bg-transparent focus:outline-none font-mono text-sm leading-relaxed text-foreground/80 placeholder:text-muted-foreground/30 selection:bg-indigo-500/20 custom-scrollbar"
                                             />
                                         </div>
                                     </Panel>
@@ -432,7 +462,8 @@ export const ArticleEditor: React.FC = () => {
                                         </div>
                                         <div
                                             ref={previewRef}
-                                            className="h-full overflow-y-scroll scroll-smooth custom-scrollbar"
+                                            onScroll={handlePreviewScroll}
+                                            className="h-full overflow-y-scroll custom-scrollbar"
                                         >
                                             <div className="max-w-2xl mx-auto py-8 md:py-12 px-4 md:px-8
                                                 prose prose-slate dark:prose-invert

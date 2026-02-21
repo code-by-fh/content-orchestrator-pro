@@ -107,7 +107,7 @@ export const DashboardLayout = () => {
             >
                 <div className="h-16 flex items-center justify-between px-4 border-b border-border/50">
                     <div className="flex items-center gap-2 overflow-hidden">
-                        <div className="h-8 w-8 rounded-lg  flex items-center justify-center shrink-0 shadow-lg shadow-indigo-500/20">
+                        <div className="h-8 w-8 rounded-lg bg-white p-1 flex items-center justify-center shrink-0 shadow-lg shadow-indigo-500/20">
                             <img src={logo} alt="Content Orchestrator Pro Logo" />
                         </div>
                         {(!collapsed || isMobile) && (
