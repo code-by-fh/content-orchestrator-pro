@@ -65,6 +65,7 @@ async function generateArticleContent(rawText: string): Promise<ValidatedArticle
             - SEO Title: Optimierter Titel für Suchmaschinen
             - SEO Description: Ein ansprechender Meta-Description-Text (max. 160 Zeichen)
             - Slug: URL-freundlicher Slug
+            - Kategorie: Kategorie für den Artikel
             
             Wichtige Hinweise:
             - Achte auf korrekte Fachbegriffe

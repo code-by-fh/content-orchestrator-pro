@@ -7,7 +7,7 @@ export class MediumAdapter implements PlatformAdapter {
     name = 'Medium';
     couldAutoPublish = true;
 
-    async publish(article: Article, accessToken?: string): Promise<PublishResult> {
+    async publish(article: Article, accessToken?: string, language: string = 'DE'): Promise<PublishResult> {
         if (!accessToken) {
             return { success: false, error: 'Medium requires an integration token.' };
         }
@@ -53,7 +53,7 @@ export class MediumAdapter implements PlatformAdapter {
         }
     }
 
-    async unpublish(articleId: string, platformId: string, accessToken?: string): Promise<boolean> {
+    async unpublish(articleId: string, platformId: string, accessToken?: string, language: string = 'DE'): Promise<boolean> {
         // Medium API does not officially support unpublishing via their public API v1
         console.warn('[MediumAdapter] Unpublishing not supported by Medium API v1');
         return false;

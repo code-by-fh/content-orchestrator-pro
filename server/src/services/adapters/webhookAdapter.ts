@@ -17,7 +17,7 @@ export class WebhookAdapter implements PlatformAdapter {
         };
     }
 
-    async publish(article: Article, _accessToken?: string): Promise<PublishResult> {
+    async publish(article: Article, _accessToken?: string, language: string = 'DE'): Promise<PublishResult> {
         if (!article.markdownContent) {
             return { success: false, error: 'Article has no content to publish.' };
         }
@@ -32,16 +32,17 @@ export class WebhookAdapter implements PlatformAdapter {
         const dateString = publishDate.toISOString().split('T')[0];
 
         try {
+            const lang = language.toLowerCase();
+
             const payload = {
                 title: article.title,
                 slug: article.slug,
                 date: dateString,
                 content: article.markdownContent,
-                category: 'General', // Default as per documentation
+                category: 'General',
                 excerpt: article.seoDescription || article.xingSummary || '',
-                locale: 'de' // Default as per documentation
+                locale: lang
             };
-
 
             await axios.post(
                 config.url,
@@ -76,18 +77,20 @@ export class WebhookAdapter implements PlatformAdapter {
         }
     }
 
-    async unpublish(_articleId: string, platformId: string, _accessToken?: string): Promise<boolean> {
+    async unpublish(_articleId: string, platformId: string, _accessToken?: string, language: string = 'DE'): Promise<boolean> {
         const config = this.getApiConfig();
         if (!config.apiKey) {
             console.error('[WebhookAdapter] Unpublish Error: WEBHOOK_API_KEY not configured');
             return false;
         }
 
+        const lang = language.toLowerCase();
+
         try {
             await axios.delete(config.url, {
                 params: {
                     slug: platformId,
-                    locale: 'de'
+                    locale: lang
                 },
                 headers: {
                     'x-api-key': config.apiKey

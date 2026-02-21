@@ -10,7 +10,7 @@ export interface PlatformAdapter {
     platform: Platform;
     name: string;
     couldAutoPublish: boolean;
-    publish(article: Article, accessToken?: string): Promise<PublishResult>;
-    unpublish(articleId: string, platformId: string, accessToken?: string): Promise<boolean>;
+    publish(article: Article, accessToken?: string, language?: string): Promise<PublishResult>;
+    unpublish(articleId: string, platformId: string, accessToken?: string, language?: string): Promise<boolean>;
 }
 

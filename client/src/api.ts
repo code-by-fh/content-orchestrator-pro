@@ -80,13 +80,13 @@ export const updateArticle = async (id: string, data: Partial<Article> & { statu
     return response.data;
 };
 
-export const publishToPlatform = async (id: string, platform: string, accessToken?: string): Promise<{ message: string; platformId?: string }> => {
-    const response = await api.post(`/content/${id}/publish`, { platform, accessToken });
+export const publishToPlatform = async (id: string, platform: string, accessToken?: string, language: string = 'DE'): Promise<{ message: string; platformId?: string }> => {
+    const response = await api.post(`/content/${id}/publish`, { platform, accessToken, language });
     return response.data;
 };
 
-export const unpublishFromPlatform = async (id: string, platform: string): Promise<{ message: string }> => {
-    const response = await api.post(`/content/${id}/unpublish`, { platform });
+export const unpublishFromPlatform = async (id: string, platform: string, language: string = 'DE'): Promise<{ message: string }> => {
+    const response = await api.post(`/content/${id}/unpublish`, { platform, language });
     return response.data;
 };
 

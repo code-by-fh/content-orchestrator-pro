@@ -7,7 +7,7 @@ export class LinkedInAdapter implements PlatformAdapter {
     name = 'LinkedIn';
     couldAutoPublish = true;
 
-    async publish(article: Article, accessToken?: string): Promise<PublishResult> {
+    async publish(article: Article, accessToken?: string, language: string = 'DE'): Promise<PublishResult> {
         if (!accessToken) {
             return { success: false, error: 'LinkedIn requires an access token.' };
         }
@@ -65,7 +65,7 @@ export class LinkedInAdapter implements PlatformAdapter {
         }
     }
 
-    async unpublish(articleId: string, platformId: string, accessToken?: string): Promise<boolean> {
+    async unpublish(articleId: string, platformId: string, accessToken?: string, language: string = 'DE'): Promise<boolean> {
         if (!accessToken || !platformId) return false;
         try {
             await axios.delete(`https://api.linkedin.com/v2/ugcPosts/${platformId}`, {

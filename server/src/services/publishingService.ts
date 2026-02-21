@@ -31,7 +31,7 @@ class PublishingService {
         }));
     }
 
-    async publishToPlatform(articleId: string, platform: Platform, accessToken?: string) {
+    async publishToPlatform(articleId: string, platform: Platform, accessToken?: string, language: string = 'DE') {
         const article = await prisma.article.findUnique({
             where: { id: articleId }
         });
@@ -47,16 +47,27 @@ class PublishingService {
 
         // 1. Create or update publication record to PENDING
         await prisma.publication.upsert({
-            where: { articleId_platform: { articleId, platform } },
-            create: { articleId, platform, status: 'PENDING' },
+            where: { articleId_platform_language: { articleId, platform, language: language as any } },
+            create: { articleId, platform, language: language as any, status: 'PENDING' },
             update: { status: 'PENDING', errorMessage: null }
         });
 
-        const result = await adapter.publish(article, accessToken);
+        // Use correct article content based on language selection
+        const publishedArticle = {
+            ...article,
+            title: language === 'EN' ? (article.titleEn || article.title) : article.title,
+            seoTitle: language === 'EN' ? (article.seoTitleEn || article.seoTitle) : article.seoTitle,
+            seoDescription: language === 'EN' ? (article.seoDescriptionEn || article.seoDescription) : article.seoDescription,
+            markdownContent: language === 'EN' ? (article.markdownContentEn || article.markdownContent) : article.markdownContent,
+            linkedinTeaser: language === 'EN' ? (article.linkedinTeaserEn || article.linkedinTeaser) : article.linkedinTeaser,
+            xingSummary: language === 'EN' ? (article.xingSummaryEn || article.xingSummary) : article.xingSummary,
+        };
+
+        const result = await adapter.publish(publishedArticle as any, accessToken, language);
 
         if (result.success) {
             await prisma.publication.update({
-                where: { articleId_platform: { articleId, platform } },
+                where: { articleId_platform_language: { articleId, platform, language: language as any } },
                 data: {
                     status: 'PUBLISHED',
                     platformId: result.platformId,
@@ -66,7 +77,7 @@ class PublishingService {
 
         } else {
             await prisma.publication.update({
-                where: { articleId_platform: { articleId, platform } },
+                where: { articleId_platform_language: { articleId, platform, language: language as any } },
                 data: {
                     status: 'ERROR',
                     errorMessage: result.error
@@ -77,9 +88,9 @@ class PublishingService {
         return result;
     }
 
-    async unpublishFromPlatform(articleId: string, platform: Platform, accessToken?: string) {
+    async unpublishFromPlatform(articleId: string, platform: Platform, accessToken?: string, language: string = 'DE') {
         const pub = await prisma.publication.findUnique({
-            where: { articleId_platform: { articleId, platform } }
+            where: { articleId_platform_language: { articleId, platform, language: language as any } }
         });
 
         if (!pub || !pub.platformId) {
@@ -89,11 +100,11 @@ class PublishingService {
 
         const adapter = this.adapters.get(platform);
         if (adapter) {
-            await adapter.unpublish(articleId, pub.platformId, accessToken);
+            await adapter.unpublish(articleId, pub.platformId, accessToken, language);
         }
 
         await prisma.publication.update({
-            where: { articleId_platform: { articleId, platform } },
+            where: { articleId_platform_language: { articleId, platform, language: language as any } },
             data: {
                 status: 'PENDING',
                 platformId: null

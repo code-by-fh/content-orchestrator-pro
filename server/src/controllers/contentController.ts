@@ -106,16 +106,36 @@ export const getArticle = async (req: Request, res: Response) => {
 
 export const publishToPlatform = async (req: Request, res: Response) => {
     const { id } = req.params;
-    const { platform, accessToken } = req.body;
+    const { platform, accessToken, language = 'DE' } = req.body;
 
     if (!platform || !Object.values(Platform).includes(platform)) {
         return res.status(400).json({ message: 'Invalid or missing platform' });
     }
 
+    if (language !== 'DE' && language !== 'EN') {
+        return res.status(400).json({ message: 'Invalid language' });
+    }
+
     try {
-        const result = await publishingService.publishToPlatform(id, platform as Platform, accessToken);
+        let currentArticle = await prisma.article.findUnique({
+            where: { id: id as string }
+        });
+
+        if (!currentArticle) {
+            return res.status(404).json({ message: 'Article not found' });
+        }
+
+        // On-the-fly translation for EN if not already cached
+        if (language === 'EN') {
+            if (!currentArticle.markdownContentEn || !currentArticle.titleEn || !currentArticle.seoTitleEn) {
+                const { translateArticleToEnglish } = await import('../services/translationService');
+                currentArticle = await translateArticleToEnglish(id);
+            }
+        }
+
+        const result = await publishingService.publishToPlatform(id, platform as Platform, accessToken, language);
         if (result.success) {
-            res.json({ message: `Successfully published to ${platform}`, platformId: result.platformId });
+            res.json({ message: `Successfully published to ${platform} in ${language}`, platformId: result.platformId });
         } else {
             res.status(500).json({ message: `Failed to publish to ${platform}`, error: result.error });
         }
@@ -127,15 +147,15 @@ export const publishToPlatform = async (req: Request, res: Response) => {
 
 export const unpublishFromPlatform = async (req: Request, res: Response) => {
     const { id } = req.params;
-    const { platform } = req.body;
+    const { platform, language = 'DE' } = req.body;
 
     if (!platform || !Object.values(Platform).includes(platform)) {
         return res.status(400).json({ message: 'Invalid or missing platform' });
     }
 
     try {
-        await publishingService.unpublishFromPlatform(id, platform as Platform);
-        res.json({ message: `Successfully unpublished from ${platform}` });
+        await publishingService.unpublishFromPlatform(id, platform as Platform, undefined, language);
+        res.json({ message: `Successfully unpublished from ${platform} in ${language}` });
     } catch (error: any) {
         console.error(error);
         res.status(500).json({ message: error.message || 'Internal server error' });
@@ -152,7 +172,7 @@ export const unpublishAllPlatforms = async (req: Request, res: Response) => {
         });
 
         for (const pub of publications) {
-            await publishingService.unpublishFromPlatform(id, pub.platform);
+            await publishingService.unpublishFromPlatform(id, pub.platform, undefined, pub.language);
         }
 
         res.json({ message: `Successfully unpublished from all platforms` });
@@ -179,7 +199,7 @@ export const deleteArticle = async (req: Request, res: Response) => {
             });
 
             for (const pub of publications) {
-                await publishingService.unpublishFromPlatform(id, pub.platform);
+                await publishingService.unpublishFromPlatform(id, pub.platform, undefined, pub.language);
             }
         }
 

@@ -21,6 +21,11 @@ enum Platform {
   WEBHOOK
 }
 
+enum Language {
+  DE
+  EN
+}
+
 enum PublicationStatus {
   PENDING
   PUBLISHED
@@ -49,6 +54,14 @@ model Article {
   seoDescription String?   @db.Text
   scheduledAt    DateTime?
 
+  // --- EN Caching Fields ---
+  titleEn            String?
+  markdownContentEn  String? @db.Text
+  linkedinTeaserEn   String? @db.Text
+  xingSummaryEn      String? @db.Text
+  seoTitleEn         String?
+  seoDescriptionEn   String? @db.Text
+
   createdAt    DateTime      @default(now())
   publications Publication[]
 }
@@ -62,8 +75,9 @@ model Publication {
   platformId   String? // ID assigned by the platform (e.g., ActivityID)
   errorMessage String?           @db.Text
   publishedAt  DateTime?
+  language     Language          @default(DE)
   createdAt    DateTime          @default(now())
   updatedAt    DateTime          @updatedAt
 
-  @@unique([articleId, platform])
+  @@unique([articleId, platform, language])
 }

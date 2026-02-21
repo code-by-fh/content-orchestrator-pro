@@ -122,8 +122,8 @@ export const ArticleEditor: React.FC = () => {
     });
 
     const publishPlatformMutation = useMutation({
-        mutationFn: ({ platform, token }: { platform: string, token?: string }) =>
-            publishToPlatform(id!, platform, token),
+        mutationFn: ({ platform, token, language }: { platform: string, token?: string, language: string }) =>
+            publishToPlatform(id!, platform, token, language),
         onSuccess: (_, variables) => {
 
             queryClient.invalidateQueries({ queryKey: ['article', id] });
@@ -134,27 +134,28 @@ export const ArticleEditor: React.FC = () => {
         }
     });
 
-    const handlePlatformPublish = (platform: string) => {
+    const handlePlatformPublish = (platform: string, language: string = 'DE') => {
         publishPlatformMutation.mutate({
             platform,
-            token: platformTokens[platform]
+            token: platformTokens[platform],
+            language
         });
     };
 
     const unpublishPlatformMutation = useMutation({
-        mutationFn: (platform: string) => unpublishFromPlatform(id!, platform),
-        onSuccess: (_, platform) => {
+        mutationFn: ({ platform, language }: { platform: string, language: string }) => unpublishFromPlatform(id!, platform, language),
+        onSuccess: (_, variables) => {
 
             queryClient.invalidateQueries({ queryKey: ['article', id] });
-            toast.success(`Unpublished from ${platform}!`);
+            toast.success(`Unpublished from ${variables.platform}!`);
         },
         onError: (error: any) => {
             toast.error(`Failed to unpublish: ${error.response?.data?.message || error.message}`);
         }
     });
 
-    const handlePlatformUnpublish = (platform: string) => {
-        unpublishPlatformMutation.mutate(platform);
+    const handlePlatformUnpublish = (platform: string, language: string = 'DE') => {
+        unpublishPlatformMutation.mutate({ platform, language });
     };
 
 
@@ -823,6 +824,7 @@ const PublishOptionsModal = ({
     const [isScheduling, setIsScheduling] = useState(false);
     const [dateTimeValue, setDateTimeValue] = useState('');
     const [error, setError] = useState('');
+    const [selectedLanguage, setSelectedLanguage] = useState<Record<string, 'DE' | 'EN'>>({});
 
     const autoPlatforms = availablePlatforms?.filter((p: any) => p.couldAutoPublish) || [];
     const manualPlatforms = availablePlatforms?.filter((p: any) => !p.couldAutoPublish) || [];
@@ -1018,61 +1020,71 @@ const PublishOptionsModal = ({
                                                 <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Automatic Distribution</span>
                                             </div>
                                             {autoPlatforms.map((p: any) => {
-                                                const pub = publications?.find((pub: any) => pub.platform === p.platform);
-                                                const isLive = pub?.status === 'PUBLISHED';
+                                                const platformPubs = publications?.filter((pub: any) => pub.platform === p.platform && pub.status === 'PUBLISHED') || [];
+                                                const isAnyLive = platformPubs.length > 0;
 
                                                 return (
                                                     <div key={p.platform} className={cn(
                                                         "rounded-xl p-4 space-y-4 transition-all border",
-                                                        isLive
+                                                        isAnyLive
                                                             ? "bg-emerald-500/[0.05] border-emerald-500/20 shadow-sm"
                                                             : "bg-muted/30 border-border/40 hover:bg-muted/40 hover:border-border/60"
                                                     )}>
-                                                        <div className="flex items-center justify-between">
-                                                            <div className="flex items-center gap-3">
-                                                                <div className={cn(
-                                                                    "w-2.5 h-2.5 rounded-full shadow-sm",
-                                                                    isLive ? "bg-emerald-500 shadow-emerald-500/20" :
-                                                                        pub?.status === 'ERROR' ? "bg-red-500 shadow-red-500/20" : "bg-muted-foreground/20 shadow-sm"
-                                                                )} />
-                                                                <div className="flex flex-col">
-                                                                    <span className="font-semibold text-sm leading-tight text-foreground">{p.name}</span>
-                                                                    <span className="text-[10px] text-muted-foreground font-medium">
-                                                                        {isLive ? 'Online' : 'Ready for auto-distribution'}
-                                                                    </span>
-                                                                </div>
-                                                            </div>
-                                                            {isLive ? (
-                                                                <div className="flex items-center gap-2">
-                                                                    <div className="text-emerald-500 flex items-center gap-1.5 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20">
-                                                                        <CheckCircle2 size={12} />
-                                                                        <span className="text-[10px] font-bold uppercase tracking-wider">Live</span>
-                                                                        {pub.platformId && <ExternalLink size={10} className="hover:scale-110 transition-transform cursor-pointer" />}
+                                                        <div className="flex flex-col gap-4">
+                                                            <div className="flex items-center justify-between">
+                                                                <div className="flex items-center gap-3">
+                                                                    <div className={cn(
+                                                                        "w-2.5 h-2.5 rounded-full shadow-sm",
+                                                                        isAnyLive ? "bg-emerald-500 shadow-emerald-500/20" : "bg-muted-foreground/20 shadow-sm"
+                                                                    )} />
+                                                                    <div className="flex flex-col">
+                                                                        <span className="font-semibold text-sm leading-tight text-foreground">{p.name}</span>
+                                                                        <span className="text-[10px] text-muted-foreground font-medium">
+                                                                            {isAnyLive ? 'Active Distribution' : 'Ready for auto-distribution'}
+                                                                        </span>
                                                                     </div>
-                                                                    <Button
-                                                                        variant="ghost"
-                                                                        size="icon"
-                                                                        className="h-8 w-8 text-amber-500 hover:text-amber-600 hover:bg-amber-500/10 rounded-full"
-                                                                        onClick={() => onUnpublishPlatform(p.platform)}
-                                                                        title="Unpublish from this platform"
+                                                                </div>
+
+                                                                <div className="flex items-center gap-2">
+                                                                    <select
+                                                                        value={selectedLanguage[p.platform] || 'DE'}
+                                                                        onChange={(e) => setSelectedLanguage({ ...selectedLanguage, [p.platform]: e.target.value as 'DE' | 'EN' })}
+                                                                        className="text-xs bg-muted/50 border border-border/50 rounded px-2 py-1 outline-none font-medium"
                                                                     >
-                                                                        <X size={14} />
+                                                                        <option value="DE">DE</option>
+                                                                        <option value="EN">EN</option>
+                                                                    </select>
+                                                                    <Button
+                                                                        size="sm"
+                                                                        variant="default"
+                                                                        className="h-8 px-4 gap-2 bg-primary hover:bg-primary/90 shadow-md shadow-primary/10"
+                                                                        onClick={() => onPublishPlatform(p.platform, selectedLanguage[p.platform] || 'DE')}
+                                                                        disabled={isPublishing}
+                                                                    >
+                                                                        {isPublishing ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />}
+                                                                        <span className="text-xs font-medium">Publish</span>
                                                                     </Button>
                                                                 </div>
-                                                            ) : (
-                                                                <Button
-                                                                    size="sm"
-                                                                    variant="default"
-                                                                    className="h-8 px-4 gap-2 bg-primary hover:bg-primary/90 shadow-md shadow-primary/10"
-                                                                    onClick={() => onPublishPlatform(p.platform)}
-                                                                    disabled={isPublishing}
-                                                                >
-                                                                    {isPublishing ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />}
-                                                                    <span className="text-xs font-medium">Publish</span>
-                                                                </Button>
+                                                            </div>
+
+                                                            {platformPubs.length > 0 && (
+                                                                <div className="flex flex-wrap gap-2 pt-2 border-t border-border/40">
+                                                                    {platformPubs.map((pub: any) => (
+                                                                        <div key={pub.id} className="flex items-center gap-2 text-emerald-500 bg-emerald-500/10 px-2 py-1 rounded-lg border border-emerald-500/20">
+                                                                            <CheckCircle2 size={10} />
+                                                                            <span className="text-[10px] font-bold uppercase tracking-wider">Live ({pub.language})</span>
+                                                                            <button
+                                                                                onClick={() => onUnpublishPlatform(p.platform, pub.language)}
+                                                                                className="hover:text-red-500 transition-colors ml-1"
+                                                                                title="Unpublish"
+                                                                            >
+                                                                                <X size={12} />
+                                                                            </button>
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
                                                             )}
                                                         </div>
-
                                                     </div>
                                                 );
                                             })}
@@ -1087,67 +1099,78 @@ const PublishOptionsModal = ({
                                                 <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Manual Sharing / Verification</span>
                                             </div>
                                             {manualPlatforms.map((p: any) => {
-                                                const pub = publications?.find((pub: any) => pub.platform === p.platform);
+                                                const platformPubs = publications?.filter((pub: any) => pub.platform === p.platform && pub.status === 'PUBLISHED') || [];
+                                                const isAnyLive = platformPubs.length > 0;
                                                 const isXing = p.platform === 'XING';
-                                                const isLive = pub?.status === 'PUBLISHED';
 
                                                 return (
                                                     <div key={p.platform} className={cn(
                                                         "rounded-xl p-4 space-y-4 transition-all border",
-                                                        isLive
+                                                        isAnyLive
                                                             ? "bg-emerald-500/[0.05] border-emerald-500/20 shadow-sm"
                                                             : "bg-amber-500/[0.03] border-amber-500/10 hover:bg-amber-500/[0.06] hover:border-amber-500/20"
                                                     )}>
-                                                        <div className="flex items-center justify-between">
-                                                            <div className="flex items-center gap-3">
-                                                                <div className={cn(
-                                                                    "w-2.5 h-2.5 rounded-full shadow-sm",
-                                                                    isLive ? "bg-emerald-500 shadow-emerald-500/20" :
-                                                                        pub?.status === 'ERROR' ? "bg-red-500 shadow-red-500/20" : "bg-amber-500 shadow-amber-500/20"
-                                                                )} />
-                                                                <div className="flex flex-col">
-                                                                    <span className="font-semibold text-sm leading-tight text-foreground">{p.name}</span>
-                                                                    <span className={cn(
-                                                                        "text-[10px] font-medium",
-                                                                        isLive ? "text-muted-foreground" : "text-amber-600/70"
-                                                                    )}>
-                                                                        {isLive ? 'Online' : 'Manual action required'}
-                                                                    </span>
-                                                                </div>
-                                                            </div>
-                                                            {isLive ? (
-                                                                <div className="flex items-center gap-2">
-                                                                    <div className="text-emerald-500 flex items-center gap-1.5 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20">
-                                                                        <CheckCircle2 size={12} />
-                                                                        <span className="text-[10px] font-bold uppercase tracking-wider">Live</span>
-                                                                        {pub.platformId && <ExternalLink size={10} className="hover:scale-110 transition-transform cursor-pointer" />}
+                                                        <div className="flex flex-col gap-4">
+                                                            <div className="flex items-center justify-between">
+                                                                <div className="flex items-center gap-3">
+                                                                    <div className={cn(
+                                                                        "w-2.5 h-2.5 rounded-full shadow-sm",
+                                                                        isAnyLive ? "bg-emerald-500 shadow-emerald-500/20" : "bg-amber-500 shadow-amber-500/20"
+                                                                    )} />
+                                                                    <div className="flex flex-col">
+                                                                        <span className="font-semibold text-sm leading-tight text-foreground">{p.name}</span>
+                                                                        <span className={cn(
+                                                                            "text-[10px] font-medium",
+                                                                            isAnyLive ? "text-muted-foreground" : "text-amber-600/70"
+                                                                        )}>
+                                                                            {isAnyLive ? 'Active Distribution' : 'Manual action required'}
+                                                                        </span>
                                                                     </div>
-                                                                    <Button
-                                                                        variant="ghost"
-                                                                        size="icon"
-                                                                        className="h-8 w-8 text-amber-500 hover:text-amber-600 hover:bg-amber-500/10 rounded-full"
-                                                                        onClick={() => onUnpublishPlatform(p.platform)}
-                                                                        title="Unpublish from this platform"
+                                                                </div>
+
+                                                                <div className="flex items-center gap-2">
+                                                                    <select
+                                                                        value={selectedLanguage[p.platform] || 'DE'}
+                                                                        onChange={(e) => setSelectedLanguage({ ...selectedLanguage, [p.platform]: e.target.value as 'DE' | 'EN' })}
+                                                                        className="text-xs bg-muted/50 border border-border/50 rounded px-2 py-1 outline-none font-medium"
                                                                     >
-                                                                        <X size={14} />
+                                                                        <option value="DE">DE</option>
+                                                                        <option value="EN">EN</option>
+                                                                    </select>
+                                                                    <Button
+                                                                        size="sm"
+                                                                        variant="default"
+                                                                        className="h-8 px-4 gap-2 bg-amber-500 hover:bg-amber-600 border-none shadow-md shadow-amber-500/10 text-white"
+                                                                        onClick={isXing ? handleXingShare : () => onPublishPlatform(p.platform, selectedLanguage[p.platform] || 'DE')}
+                                                                        disabled={isPublishing}
+                                                                    >
+                                                                        {isXing ? <ExternalLink size={12} /> : (isPublishing ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />)}
+                                                                        <span className="text-xs font-medium">{isXing ? 'Share on Xing' : 'Publish'}</span>
                                                                     </Button>
                                                                 </div>
-                                                            ) : (
-                                                                <Button
-                                                                    size="sm"
-                                                                    variant="default"
-                                                                    className="h-8 px-4 gap-2 bg-amber-500 hover:bg-amber-600 border-none shadow-md shadow-amber-500/10 text-white"
-                                                                    onClick={isXing ? handleXingShare : () => onPublishPlatform(p.platform)}
-                                                                    disabled={isPublishing}
-                                                                >
-                                                                    {isXing ? <ExternalLink size={12} /> : (isPublishing ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />)}
-                                                                    <span className="text-xs font-medium">{isXing ? 'Share on Xing' : 'Publish'}</span>
-                                                                </Button>
+                                                            </div>
+
+                                                            {platformPubs.length > 0 && (
+                                                                <div className="flex flex-wrap gap-2 pt-2 border-t border-border/40">
+                                                                    {platformPubs.map((pub: any) => (
+                                                                        <div key={pub.id} className="flex items-center gap-2 text-emerald-500 bg-emerald-500/10 px-2 py-1 rounded-lg border border-emerald-500/20">
+                                                                            <CheckCircle2 size={10} />
+                                                                            <span className="text-[10px] font-bold uppercase tracking-wider">Live ({pub.language})</span>
+                                                                            <button
+                                                                                onClick={() => onUnpublishPlatform(p.platform, pub.language)}
+                                                                                className="hover:text-red-500 transition-colors ml-1"
+                                                                                title="Unpublish"
+                                                                            >
+                                                                                <X size={12} />
+                                                                            </button>
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
                                                             )}
                                                         </div>
 
 
-                                                        {!isXing && !isLive && (
+                                                        {!isXing && (
                                                             <div className="space-y-2 pt-1 border-t border-border/20 mt-2">
                                                                 <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Access Token</label>
                                                                 <input
@@ -1163,12 +1186,14 @@ const PublishOptionsModal = ({
                                                             </div>
                                                         )}
 
-                                                        {pub?.status === 'ERROR' && (
-                                                            <div className="flex items-start gap-2 text-red-500 bg-red-500/5 p-3 rounded-lg border border-red-500/20">
+                                                        {publications?.filter((pub: any) => pub.platform === p.platform && pub.status === 'ERROR').map((errorPub: any) => (
+                                                            <div key={errorPub.id} className="flex items-start gap-2 text-red-500 bg-red-500/5 p-3 rounded-lg border border-red-500/20">
                                                                 <AlertCircle size={14} className="mt-0.5 shrink-0" />
-                                                                <p className="text-[11px] leading-relaxed italic">{pub.errorMessage || 'Action required.'}</p>
+                                                                <p className="text-[11px] leading-relaxed italic">
+                                                                    <span className="font-bold">{errorPub.language}:</span> {errorPub.errorMessage || 'Action required.'}
+                                                                </p>
                                                             </div>
-                                                        )}
+                                                        ))}
                                                     </div>
                                                 );
                                             })}

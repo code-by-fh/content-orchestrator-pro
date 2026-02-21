@@ -7,7 +7,7 @@ export class XingAdapter implements PlatformAdapter {
     name = 'Xing';
     couldAutoPublish = false;
 
-    async publish(article: Article, accessToken?: string): Promise<PublishResult> {
+    async publish(article: Article, accessToken?: string, language: string = 'DE'): Promise<PublishResult> {
         if (!accessToken) {
             return { success: false, error: 'Access token is required for Xing publishing.' };
         }
@@ -64,7 +64,7 @@ export class XingAdapter implements PlatformAdapter {
         }
     }
 
-    async unpublish(articleId: string, platformId: string, accessToken?: string): Promise<boolean> {
+    async unpublish(articleId: string, platformId: string, accessToken?: string, language: string = 'DE'): Promise<boolean> {
         if (!accessToken || !platformId) return false;
 
         console.log(`[XingAdapter] Attempting to unpublish share ${platformId}`);
