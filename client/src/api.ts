@@ -95,6 +95,11 @@ export const unpublishAllFromArticle = async (id: string): Promise<{ message: st
     return response.data;
 };
 
+export const getShareUrl = async (id: string, platform: string, language: string = 'DE'): Promise<{ shareUrl: string }> => {
+    const response = await api.get(`/content/${id}/share-url`, { params: { platform, language } });
+    return response.data;
+};
+
 export const uploadImage = async (file: File): Promise<{ imageUrl: string }> => {
     const formData = new FormData();
     formData.append('image', file);

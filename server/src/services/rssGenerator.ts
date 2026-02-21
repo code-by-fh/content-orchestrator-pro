@@ -1,6 +1,6 @@
 import { Feed } from 'feed';
 import MarkdownIt from 'markdown-it';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Platform } from '@prisma/client';
 
 const prisma = new PrismaClient();
 const md = new MarkdownIt();
@@ -9,12 +9,18 @@ export const generateRssFeed = async () => {
     const articles = await prisma.article.findMany({
         where: {
             publications: {
-                some: { status: 'PUBLISHED' }
+                some: {
+                    platform: Platform.RSS,
+                    status: 'PUBLISHED'
+                }
             }
         },
         include: {
             publications: {
-                where: { status: 'PUBLISHED' },
+                where: {
+                    platform: Platform.RSS,
+                    status: 'PUBLISHED'
+                },
                 orderBy: { publishedAt: 'desc' },
                 take: 1
             }
@@ -36,10 +42,14 @@ export const generateRssFeed = async () => {
     articles.forEach((article) => {
         const htmlContent = article.markdownContent ? md.render(article.markdownContent) : '';
 
+        const lang = (article.publications[0]?.language || 'de').toLowerCase();
+        const baseUrl = process.env.PUBLIC_ARTICLE_BASE_URL || 'http://localhost:5173';
+        const formattedBaseUrl = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
+
         feed.addItem({
             title: article.title,
             id: article.id,
-            link: `${process.env.PUBLIC_ARTICLE_BASE_URL || 'http://localhost:5173/articles'}/${article.slug}`,
+            link: `${formattedBaseUrl}/${lang}/blog/${article.slug}`,
             description: article.linkedinTeaser || article.title,
             content: htmlContent,
             date: article.publications[0]?.publishedAt || article.createdAt,

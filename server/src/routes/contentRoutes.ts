@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import multer from 'multer';
 import path from 'path';
-import { createContent, deleteArticle, getArticle, getArticles, publishToPlatform, reprocessArticle, unpublishAllPlatforms, unpublishFromPlatform, updateArticle, uploadImage } from '../controllers/contentController';
+import { createContent, deleteArticle, getArticle, getArticles, getShareUrl, publishToPlatform, reprocessArticle, unpublishAllPlatforms, unpublishFromPlatform, updateArticle, uploadImage } from '../controllers/contentController';
 import { authenticateToken } from '../middleware/auth';
 
 const router = Router();
@@ -38,6 +38,7 @@ router.post('/:id/reprocess', authenticateToken, reprocessArticle);
 router.post('/:id/publish', authenticateToken, publishToPlatform);
 router.post('/:id/unpublish', authenticateToken, unpublishFromPlatform);
 router.post('/:id/unpublish-all', authenticateToken, unpublishAllPlatforms);
+router.get('/:id/share-url', authenticateToken, getShareUrl);
 router.post('/upload-image', authenticateToken, upload.single('image'), uploadImage);
 
 export default router;

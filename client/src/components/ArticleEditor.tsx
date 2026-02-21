@@ -6,7 +6,7 @@ import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { getArticle, updateArticle, publishToPlatform, unpublishFromPlatform, unpublishAllFromArticle, uploadImage } from '../api';
+import { getArticle, updateArticle, publishToPlatform, unpublishFromPlatform, unpublishAllFromArticle, uploadImage, getShareUrl } from '../api';
 import {
     Loader2,
     Link as LinkIcon,
@@ -947,15 +947,13 @@ export const ArticleEditor: React.FC = () => {
                 onUnpublishPlatform={handlePlatformUnpublish}
                 onUnpublishAll={handleUnpublishAll}
                 onPublishAll={handlePublishAll}
-
-
                 onSchedule={handleSchedule}
-
                 platformTokens={platformTokens}
                 setPlatformTokens={setPlatformTokens}
                 isPublishing={publishPlatformMutation.isPending}
                 scheduledAt={article?.scheduledAt}
-                sourceUrl={article?.sourceUrl}
+                xingSummary={xingSummary}
+                article={article}
                 onUnpublish={() => setShowUnpublishConfirm(true)}
                 status={article?.publications?.some((p: any) => p.status === 'PUBLISHED') ? 'PUBLISHED' : article?.scheduledAt ? 'SCHEDULED' : 'DRAFT'}
             />
@@ -1121,7 +1119,8 @@ const PublishOptionsModal = ({
     setPlatformTokens,
     isPublishing,
     scheduledAt,
-    sourceUrl,
+    xingSummary,
+    article,
     onUnpublish,
     status
 }: any) => {
@@ -1139,10 +1138,27 @@ const PublishOptionsModal = ({
     const isLiveOrScheduled = status === 'PUBLISHED' || status === 'SCHEDULED';
 
 
-    const handleXingShare = () => {
-        if (!sourceUrl) return;
-        const xingUrl = `https://www.xing.com/spi/shares/new?url=${encodeURIComponent(sourceUrl)}`;
-        window.open(xingUrl, '_blank', 'width=600,height=500');
+    const handleXingShare = async (platformKey: string) => {
+        if (!article?.id) return;
+
+        try {
+            const lang = selectedLanguage[platformKey] || 'DE';
+            const { shareUrl } = await getShareUrl(article.id, platformKey, lang);
+
+            // Use language-specific summary if available, fallback to current edit state
+            const summary = lang === 'EN' ? (article?.xingSummaryEn || xingSummary) : xingSummary;
+
+            window.open(shareUrl, '_blank', 'width=600,height=500');
+
+            // Copy summary to clipboard to assist the user
+            if (summary) {
+                navigator.clipboard.writeText(summary);
+                toast.success(`Xing summary (${lang}) copied to clipboard! You can paste it in the sharing dialog.`);
+            }
+        } catch (error) {
+            console.error('Failed to get share URL:', error);
+            toast.error('Failed to generate sharing link.');
+        }
     };
 
 
@@ -1448,7 +1464,7 @@ const PublishOptionsModal = ({
                                                                         size="sm"
                                                                         variant="default"
                                                                         className="h-8 px-4 gap-2 bg-amber-500 hover:bg-amber-600 border-none shadow-md shadow-amber-500/10 text-white"
-                                                                        onClick={isXing ? handleXingShare : () => onPublishPlatform(p.platform, selectedLanguage[p.platform] || 'DE')}
+                                                                        onClick={isXing ? () => handleXingShare(p.platform) : () => onPublishPlatform(p.platform, selectedLanguage[p.platform] || 'DE')}
                                                                         disabled={isPublishing}
                                                                     >
                                                                         {isXing ? <ExternalLink size={12} /> : (isPublishing ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />)}

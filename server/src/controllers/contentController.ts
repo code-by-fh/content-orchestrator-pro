@@ -287,6 +287,35 @@ export const reprocessArticle = async (req: Request, res: Response) => {
     }
 };
 
+export const getShareUrl = async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const { platform, language } = req.query;
+
+    try {
+        const article = await prisma.article.findUnique({ where: { id: id as string } });
+        if (!article) return res.status(404).json({ message: 'Article not found' });
+
+        const lang = ((language as string) || 'DE').toLowerCase();
+        const baseUrl = process.env.PUBLIC_ARTICLE_BASE_URL || "http://localhost:5173";
+        const formattedBaseUrl = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
+        const randomV = Math.random().toString(36).substring(2, 8);
+        const publicArticleUrl = `${formattedBaseUrl}/${lang}/blog/${article.slug}?v=${randomV}`;
+
+        let shareUrl = '';
+        if (platform === 'XING') {
+            shareUrl = `https://www.xing.com/spi/shares/new?url=${encodeURIComponent(publicArticleUrl)}`;
+        } else {
+            // Default to just the article URL if no platform or unsupported
+            shareUrl = publicArticleUrl;
+        }
+
+        res.json({ shareUrl });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Failed to generate share URL' });
+    }
+};
+
 export const uploadImage = async (req: Request, res: Response) => {
     try {
         if (!req.file) {

@@ -7,9 +7,9 @@ export class RssAdapter implements PlatformAdapter {
     couldAutoPublish = true;
 
     async publish(article: Article, _accessToken?: string, language: string = 'DE'): Promise<PublishResult> {
-        // Since our RSS feed is dynamically generated from articles with status 'PUBLISHED',
-        // 'publishing' to RSS simply means confirming it should be visible there.
-        // The PublishingService will handle the status transition.
+        // Since our RSS feed is dynamically generated from articles with status 'PUBLISHED'
+        // specifically for the RSS platform, 'publishing' to RSS confirms visibility there.
+        // The PublishingService will handle the status transition for the RSS publication record.
 
         console.log(`[RssAdapter] Article "${article.title}" is now eligible for the RSS feed.`);
 
