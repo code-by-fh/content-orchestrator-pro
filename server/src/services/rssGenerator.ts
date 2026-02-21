@@ -25,8 +25,8 @@ export const generateRssFeed = async () => {
     const feed = new Feed({
         title: "Content Orchestrator Pro Feed",
         description: "Automated content derived from various sources.",
-        id: "http://localhost:3000/",
-        link: "http://localhost:3000/",
+        id: process.env.BACKEND_URL || "http://localhost:3000/",
+        link: process.env.BACKEND_URL || "http://localhost:3000/",
         language: "en",
         copyright: "All rights reserved 2026",
         updated: articles[0]?.publications[0]?.publishedAt || new Date(),
@@ -39,7 +39,7 @@ export const generateRssFeed = async () => {
         feed.addItem({
             title: article.title,
             id: article.id,
-            link: `http://localhost:5173/articles/${article.id}`,
+            link: `${process.env.PUBLIC_ARTICLE_BASE_URL || 'http://localhost:5173/articles'}/${article.slug}`,
             description: article.linkedinTeaser || article.title,
             content: htmlContent,
             date: article.publications[0]?.publishedAt || article.createdAt,

@@ -25,7 +25,7 @@ export class XingAdapter implements PlatformAdapter {
             const response = await axios.post(
                 'https://api.xing.com/v1/users/me/share/link',
                 {
-                    uri: article.sourceUrl,
+                    uri: `${process.env.PUBLIC_ARTICLE_BASE_URL || 'http://localhost:5173/articles'}/${article.slug}`,
                     comment: article.xingSummary
                 },
                 {

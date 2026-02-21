@@ -31,7 +31,7 @@ export class MediumAdapter implements PlatformAdapter {
                     title: article.title,
                     contentFormat: 'markdown',
                     content: article.markdownContent,
-                    canonicalUrl: article.sourceUrl,
+                    canonicalUrl: `${process.env.PUBLIC_ARTICLE_BASE_URL || 'http://localhost:5173/articles'}/${article.slug}`,
                     publishStatus: 'public'
                 },
                 {

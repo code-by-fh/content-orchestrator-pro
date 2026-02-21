@@ -33,7 +33,7 @@ export class LinkedInAdapter implements PlatformAdapter {
                     specificContent: {
                         'com.linkedin.ugc.ShareContent': {
                             shareCommentary: {
-                                text: article.linkedinTeaser
+                                text: `${article.linkedinTeaser}\n\n${process.env.PUBLIC_ARTICLE_BASE_URL || 'http://localhost:5173/articles'}/${article.slug}`
                             },
                             shareMediaCategory: 'NONE'
                         }
