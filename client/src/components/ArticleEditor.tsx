@@ -103,7 +103,7 @@ export const ArticleEditor: React.FC = () => {
 
     const updateMutation = useMutation({
         mutationFn: (data: Partial<Article> & { status?: string }) => updateArticle(id!, data),
-        onSuccess: (data, variables) => {
+        onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: ['article', id] });
             if (variables.status === 'PUBLISHED') {
                 toast.success('Article published successfully!');
@@ -436,12 +436,16 @@ export const ArticleEditor: React.FC = () => {
                                         >
                                             <div className="max-w-2xl mx-auto py-8 md:py-12 px-4 md:px-8
                                                 prose prose-slate dark:prose-invert
-                                                text-foreground/80 dark:text-gray-300
-                                                dark:prose-headings:text-gray-100
+                                                text-foreground/80 dark:text-gray-100
+                                                dark:prose-headings:text-white
                                                 prose-sm md:prose-base">
                                                 <ReactMarkdown
                                                     remarkPlugins={[remarkGfm]}
                                                     components={{
+                                                        h1: ({ node, ...props }) => <h1 {...props} className="text-foreground dark:text-white font-bold border-b border-border/50 pb-2 mb-6" />,
+                                                        h2: ({ node, ...props }) => <h2 {...props} className="text-foreground dark:text-white font-bold mt-8 mb-4" />,
+                                                        h3: ({ node, ...props }) => <h3 {...props} className="text-foreground dark:text-white font-semibold mt-6 mb-3" />,
+                                                        strong: ({ node, ...props }) => <strong {...props} className="text-foreground dark:text-white font-bold" />,
                                                         code(props) {
                                                             const { children, className, node, ref, ...rest } = props
                                                             const match = /language-(\w+)/.exec(className || '')

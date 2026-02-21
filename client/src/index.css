@@ -214,4 +214,13 @@
         scrollbar-gutter: stable;
         -webkit-overflow-scrolling: touch;
     }
+
+    .dark .prose :where(code):not(:where([class~="not-prose"], [class~="not-prose"] *)) {
+        color: oklch(100% 0.00011 271.152) !important;
+    }
+
+
+    .dark .prose :where(h4):not(:where([class~="not-prose"], [class~="not-prose"] *)) {
+        color: oklch(100% 0.00011 271.152) !important;
+    }
 }
