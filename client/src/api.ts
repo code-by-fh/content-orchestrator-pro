@@ -70,6 +70,11 @@ export const deleteArticle = async (id: string): Promise<void> => {
     await api.delete(`/content/${id}`);
 };
 
+export const reprocessArticle = async (id: string): Promise<{ message: string }> => {
+    const response = await api.post(`/content/${id}/reprocess`);
+    return response.data;
+};
+
 export const updateArticle = async (id: string, data: Partial<Article> & { status?: string }): Promise<Article> => {
     const response = await api.put(`/content/${id}`, data);
     return response.data;

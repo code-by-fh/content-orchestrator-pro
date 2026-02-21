@@ -26,15 +26,23 @@ enum PublicationStatus {
   ERROR
 }
 
+enum ProcessingStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
 model Article {
-  id              String  @id @default(uuid())
-  title           String
-  slug            String  @unique
-  sourceUrl       String
-  rawTranscript   String  @db.Text
-  markdownContent String? @db.Text
-  linkedinTeaser  String? @db.Text
-  xingSummary     String? @db.Text
+  id               String           @id @default(uuid())
+  title            String
+  slug             String           @unique
+  sourceUrl        String
+  rawTranscript    String           @db.Text
+  markdownContent  String?          @db.Text
+  linkedinTeaser   String?          @db.Text
+  xingSummary      String?          @db.Text
+  processingStatus ProcessingStatus @default(PROCESSING)
 
   seoTitle       String?
   seoDescription String?   @db.Text

@@ -2,7 +2,7 @@ import { Worker, Job } from 'bullmq';
 import { PrismaClient } from '@prisma/client';
 import { GoogleGenAI, Type } from '@google/genai';
 import { z } from 'zod';
-import { extractMediumContent } from './services/medium';
+import { extractMediumContent } from './services/mediumExtractor';
 import dotenv from 'dotenv';
 import { exec } from 'child_process';
 import path from 'path';
@@ -101,21 +101,39 @@ async function generateArticleContent(rawText: string): Promise<ValidatedArticle
 // 4. Worker Implementierung
 const worker = new Worker('content-queue', async (job: Job) => {
     const { articleId, type, sourceUrl } = job.data;
+    const jobStartTime = performance.now();
+
+    console.log(`\n======================================================`);
+    console.log(`🚀 [Job Started] Article ID: ${articleId} | Type: ${type}`);
+    console.log(`======================================================`);
 
     try {
-        // Status processing removed
+        const dbStart = performance.now();
+        await prisma.article.update({
+            where: { id: articleId },
+            data: { processingStatus: 'PROCESSING' }
+        });
+        const initialDbTime = performance.now() - dbStart;
+        console.log(`[Status Update] Set to PROCESSING in ${initialDbTime.toFixed(2)}ms`);
 
         let rawText = '';
 
-        // Extraktions-Logik
+        // --- Step 1: Extraction ---
+        console.log(`\n⏳ [Step 1: Extraction] Starting ${type} text extraction...`);
+        const extractionStart = performance.now();
+
         if (type === 'YOUTUBE') {
             const videoId = sourceUrl.match(/(?:v=|\/)([\w-]{11})(?:\?|&|\/|$)/)?.[1];
             if (!videoId) throw new Error('Ungültige YouTube URL');
 
             rawText = await new Promise<string>((resolve, reject) => {
                 const scriptPath = path.join(__dirname, '../scripts/extract_transcript.py');
+                const execStart = performance.now();
                 exec(`python "${scriptPath}" "${videoId}"`, (error, stdout, stderr) => {
-                    if (error) return reject(new Error(stderr));
+                    if (error) {
+                        console.error(`[Extraction Error] Python script failed after ${(performance.now() - execStart).toFixed(2)}ms: ${stderr}`);
+                        return reject(new Error(stderr));
+                    }
                     const res = JSON.parse(stdout);
                     res.success ? resolve(res.text) : reject(new Error(res.error));
                 });
@@ -124,10 +142,21 @@ const worker = new Worker('content-queue', async (job: Job) => {
             rawText = await extractMediumContent(sourceUrl);
         }
 
-        // KI-Generierung (Wichtig: await benutzen!)
-        const validatedData = await generateArticleContent(rawText);
+        const extractionTime = performance.now() - extractionStart;
+        console.log(`✅ [Step 1: Extraction] Completed in ${extractionTime.toFixed(2)}ms. Extracted ${rawText.length} characters.`);
 
-        // Update Datenbank
+        // --- Step 2: AI Generation ---
+        console.log(`\n🧠 [Step 2: AI Generation] Sending content to Gemini...`);
+        const generationStart = performance.now();
+        const validatedData = await generateArticleContent(rawText);
+        const generationTime = performance.now() - generationStart;
+
+        console.log(`✅ [Step 2: AI Generation] Completed in ${generationTime.toFixed(2)}ms.`);
+
+        // --- Step 3: Database Update ---
+        console.log(`\n💾 [Step 3: DB Update] Saving results to database...`);
+        const finalDbStart = performance.now();
+
         await prisma.article.update({
             where: { id: articleId },
             data: {
@@ -138,13 +167,43 @@ const worker = new Worker('content-queue', async (job: Job) => {
                 seoTitle: validatedData.seoTitle,
                 seoDescription: validatedData.seoDescription,
                 slug: validatedData.slug,
-                rawTranscript: rawText
+                rawTranscript: rawText,
+                processingStatus: 'COMPLETED'
             },
         });
 
+        const finalDbTime = performance.now() - finalDbStart;
+        console.log(`✅ [Step 3: DB Update] Completed in ${finalDbTime.toFixed(2)}ms.`);
+
+        // --- Summary ---
+        const totalJobTime = performance.now() - jobStartTime;
+
+        // Find longest step
+        const steps = [
+            { name: 'Extraction', duration: extractionTime },
+            { name: 'AI Generation', duration: generationTime },
+            { name: 'Database Update', duration: finalDbTime + initialDbTime }
+        ];
+        const longestStep = steps.reduce((prev, current) => (prev.duration > current.duration) ? prev : current);
+
+        console.log(`\n📊 ========== GENERATION SUMMARY ==========`);
+        console.log(`Total Time:      ${totalJobTime.toFixed(2)}ms`);
+        console.log(`Longest Step:    ${longestStep.name} (${longestStep.duration.toFixed(2)}ms)`);
+        console.table(steps.map(s => ({ Step: s.name, "Duration (ms)": s.duration.toFixed(2) })));
+        console.log(`===========================================\n`);
+
     } catch (error: any) {
-        console.error(`Job failed: ${error.message}`);
-        console.error(`Status update to ERROR for ${articleId} removed due to schema change`);
+        const totalFailTime = performance.now() - jobStartTime;
+        console.error(`\n❌ [Job Failed] Failed after ${totalFailTime.toFixed(2)}ms: ${error.message}`);
+
+        try {
+            await prisma.article.update({
+                where: { id: articleId },
+                data: { processingStatus: 'FAILED' }
+            });
+        } catch (dbError) {
+            console.error('Failed to update article status to FAILED', dbError);
+        }
         throw error;
     }
 }, {

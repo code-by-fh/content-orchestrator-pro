@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useInView } from 'react-intersection-observer';
-import { getArticles, createArticle, deleteArticle, updateArticle, unpublishAllFromArticle } from '../api';
+import { getArticles, createArticle, deleteArticle, updateArticle, unpublishAllFromArticle, reprocessArticle } from '../api';
 import { Link } from 'react-router-dom';
-import { Plus, Youtube, FileText, Loader2, Clock, CheckCircle, Trash2, Calendar, Search, Filter } from 'lucide-react';
+import { Plus, Youtube, FileText, Loader2, Clock, CheckCircle, Trash2, Calendar, Search, Filter, AlertCircle, Play } from 'lucide-react';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
 import { cn } from '../lib/utils';
@@ -100,6 +100,17 @@ export const ArticleList: React.FC = () => {
         },
         onError: (error: any) => {
             toast.error(`Failed to unpublish: ${error.message}`);
+        }
+    });
+
+    const reprocessMutation = useMutation({
+        mutationFn: (id: string) => reprocessArticle(id),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['articles'] });
+            toast.success("Processing started");
+        },
+        onError: (error: any) => {
+            toast.error(`Failed to start processing: ${error.message}`);
         }
     });
 
@@ -232,7 +243,11 @@ export const ArticleList: React.FC = () => {
 
                                             <div className="flex items-center justify-between w-full md:w-auto md:justify-end gap-4 pl-0 md:pl-4 mt-4 md:mt-0 border-t md:border-t-0 border-white/5 pt-4 md:pt-0 shrink-0">
                                                 <div className="flex items-center gap-2 text-xs font-medium bg-secondary/50 px-2.5 py-1 rounded-full border border-white/5">
-                                                    {article.publications?.some(pub => pub.status === 'PUBLISHED') ? (
+                                                    {article.processingStatus === 'PROCESSING' || article.processingStatus === 'PENDING' ? (
+                                                        <><Loader2 size={16} className="text-indigo-500 animate-spin" /><span className="capitalize">Processing</span></>
+                                                    ) : article.processingStatus === 'FAILED' ? (
+                                                        <><AlertCircle size={16} className="text-red-500" /><span className="capitalize">Failed</span></>
+                                                    ) : article.publications?.some((pub: any) => pub.status === 'PUBLISHED') ? (
                                                         <><CheckCircle size={16} className="text-emerald-500" /><span className="capitalize">Published</span></>
                                                     ) : article.scheduledAt ? (
                                                         <><Calendar size={16} className="text-blue-500" /><span className="capitalize">Scheduled</span></>
@@ -248,8 +263,9 @@ export const ArticleList: React.FC = () => {
                                                         article={article}
                                                         onDelete={() => setConfirmDeleteItem({ id: article.id, isPublished: !!article.publications?.some(pub => pub.status === 'PUBLISHED'), isScheduled: !!article.scheduledAt })}
                                                         onUnpublish={(id) => setConfirmUnpublishItem({ id })}
+                                                        onReprocess={() => reprocessMutation.mutate(article.id)}
                                                         isUnpublishing={unpublishMutation.isPending && unpublishMutation.variables === article.id}
-
+                                                        isReprocessing={reprocessMutation.isPending && reprocessMutation.variables === article.id}
                                                     />
                                                 </div>
                                             </div>
@@ -330,7 +346,21 @@ export const ArticleList: React.FC = () => {
     );
 };
 
-const ArticleActions = ({ article, onDelete, onUnpublish, isUnpublishing }: { article: any, onDelete: () => void, onUnpublish: (id: string) => void, isUnpublishing: boolean }) => {
+const ArticleActions = ({
+    article,
+    onDelete,
+    onUnpublish,
+    onReprocess,
+    isUnpublishing,
+    isReprocessing
+}: {
+    article: any,
+    onDelete: () => void,
+    onUnpublish: (id: string) => void,
+    onReprocess: () => void,
+    isUnpublishing: boolean,
+    isReprocessing: boolean
+}) => {
 
     return (
         <div className="flex items-center gap-1">
@@ -347,6 +377,22 @@ const ArticleActions = ({ article, onDelete, onUnpublish, isUnpublishing }: { ar
                     }}
                 >
                     {isUnpublishing ? <Loader2 size={16} className="animate-spin" /> : <Loader2 size={16} className="rotate-180" />}
+                </Button>
+            )}
+            {(article.processingStatus === 'FAILED' || article.processingStatus === 'COMPLETED') && (
+                <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-muted-foreground hover:text-indigo-500 hover:bg-indigo-500/10 z-10 relative"
+                    title="Start/Retry Processing"
+                    onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        onReprocess();
+                    }}
+                    disabled={isReprocessing}
+                >
+                    {isReprocessing ? <Loader2 size={16} className="animate-spin" /> : <Play size={16} />}
                 </Button>
             )}
             <Button

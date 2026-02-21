@@ -3,6 +3,8 @@ export type Platform = 'XING' | 'LINKEDIN' | 'MEDIUM' | 'RSS';
 
 export type PublicationStatus = 'PENDING' | 'PUBLISHED' | 'ERROR';
 
+export type ProcessingStatus = 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
+
 export interface Publication {
     id: string;
     platform: Platform;
@@ -29,6 +31,7 @@ export interface Article {
     xingSummary?: string;
     seoTitle?: string;
     seoDescription?: string;
+    processingStatus: ProcessingStatus;
 
     scheduledAt?: string;
     createdAt: string;

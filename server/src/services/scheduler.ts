@@ -1,6 +1,6 @@
 import cron from 'node-cron';
-import { PrismaClient } from '@prisma/client';
-import { postToLinkedIn } from './linkedin';
+import { PrismaClient, Platform } from '@prisma/client';
+import { publishingService } from './publishingService';
 
 const prisma = new PrismaClient();
 
@@ -14,7 +14,6 @@ export const initScheduler = () => {
 
             const articlesToPublish = await prisma.article.findMany({
                 where: {
-                    // status removed, relying on scheduledAt
                     scheduledAt: {
                         lte: now,
                     },
@@ -26,18 +25,22 @@ export const initScheduler = () => {
             }
 
             for (const article of articlesToPublish) {
-                // 1. Update status to PUBLISHED
-                const updatedArticle = await prisma.article.update({
+                // 1. Mark as no longer scheduled (avoid re-processing)
+                await prisma.article.update({
                     where: { id: article.id },
                     data: {
                         scheduledAt: null,
                     },
                 });
 
-                // 2. Trigger LinkedIn Push
-                await postToLinkedIn(updatedArticle);
+                // 2. Trigger Publication via PublishingService for all configured platforms
+                // Currently defaults to LinkedIn if it was a single postToLinkedIn call before
+                // but we could make this more dynamic based on user intent.
+                // For now, keeping original intent (LinkedIn) but via the proper service.
 
-                console.log(`[Scheduler] Published article ${article.id}`);
+                await publishingService.publishToPlatform(article.id, Platform.LINKEDIN);
+
+                console.log(`[Scheduler] Published article ${article.id} to LinkedIn`);
             }
         } catch (error) {
             console.error('[Scheduler] Error:', error);

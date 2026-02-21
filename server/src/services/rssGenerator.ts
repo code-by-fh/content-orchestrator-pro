@@ -19,16 +19,15 @@ export const generateRssFeed = async () => {
                 take: 1
             }
         },
-        orderBy: { createdAt: 'desc' }, // Fallback sort, though ideally sorted by publication date
+        orderBy: { createdAt: 'desc' },
     });
 
-    console.log(articles);
     const feed = new Feed({
         title: "Content Orchestrator Pro Feed",
         description: "Automated content derived from various sources.",
-        id: "http://localhost:3000/", // Replace with actual domain
+        id: "http://localhost:3000/",
         link: "http://localhost:3000/",
-        language: "en", // or de
+        language: "en",
         copyright: "All rights reserved 2026",
         updated: articles[0]?.publications[0]?.publishedAt || new Date(),
         generator: "Content Orchestrator Pro",
@@ -40,7 +39,7 @@ export const generateRssFeed = async () => {
         feed.addItem({
             title: article.title,
             id: article.id,
-            link: `http://localhost:5173/articles/${article.id}`, // Link to frontend
+            link: `http://localhost:5173/articles/${article.id}`,
             description: article.linkedinTeaser || article.title,
             content: htmlContent,
             date: article.publications[0]?.publishedAt || article.createdAt,

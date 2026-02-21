@@ -12,10 +12,8 @@ export const extractMediumContent = async (url: string): Promise<string> => {
         // Parse HTML
         const $ = cheerio.load(data);
 
-        // Specific logic for freedium structure (might need adjustment based on actual freedium response)
-        // Assuming article content matches standard structure or trying to be generic
+        // Specific logic for freedium structure
         // Freedium usually renders the medium content in a container.
-        // Let's try to grab main content.
 
         // Remove unwanted elements
         $('script').remove();
@@ -24,8 +22,7 @@ export const extractMediumContent = async (url: string): Promise<string> => {
         $('header').remove();
         $('footer').remove();
 
-        // Extract text from body or specific container if known
-        // Let's try generic body text for now, but usually it's in <article> or similar
+        // Extract text from body
         const content = $('body').text().replace(/\s+/g, ' ').trim();
 
         return content;

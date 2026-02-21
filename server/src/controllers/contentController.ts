@@ -4,7 +4,6 @@ import { publishingService } from '../services/publishingService';
 
 import { z } from 'zod';
 import { addContentJob } from '../queue/producer';
-import { extractVideoId } from '../services/youtube';
 
 const prisma = new PrismaClient();
 
@@ -18,6 +17,8 @@ export const createContent = async (req: Request, res: Response) => {
     try {
         const { url, type, title } = createContentSchema.parse(req.body);
 
+        console.log(`[Content] Received request to generate article from ${type} URL: ${url}`);
+
         let slug = title ? title.toLowerCase().replace(/ /g, '-') : `draft-${Date.now()}`;
 
         // Simple unique check logic or rely on catch
@@ -29,10 +30,14 @@ export const createContent = async (req: Request, res: Response) => {
                 slug: slug,
                 sourceUrl: url,
                 rawTranscript: '',
+                processingStatus: 'PENDING',
             },
         });
 
+
         await addContentJob(article.id, type, url);
+
+        console.log(`[Content] Successfully queued job for new article (ID: ${article.id})`);
 
         res.json(article);
     } catch (error) {
@@ -229,5 +234,35 @@ export const updateArticle = async (req: Request, res: Response) => {
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Failed to update article' });
+    }
+};
+
+export const reprocessArticle = async (req: Request, res: Response) => {
+    const { id } = req.params;
+    console.log(`[Content] Received request to reprocess article (ID: ${id})`);
+
+    try {
+        const article = await prisma.article.findUnique({ where: { id: id as string } });
+        if (!article) return res.status(404).json({ message: 'Article not found' });
+
+        await prisma.article.update({
+            where: { id },
+            data: { processingStatus: 'PENDING' }
+        });
+
+        // Determine type based on sourceUrl
+        let type: 'YOUTUBE' | 'MEDIUM' = 'YOUTUBE';
+        if (article.sourceUrl.includes('medium.com')) {
+            type = 'MEDIUM';
+        }
+
+        await addContentJob(article.id, type, article.sourceUrl);
+
+        console.log(`[Content] Successfully re-queued job for article (ID: ${article.id})`);
+
+        res.json({ message: 'Re-processing started' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Failed to re-process article' });
     }
 };

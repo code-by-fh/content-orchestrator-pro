@@ -281,6 +281,42 @@ export const ArticleEditor: React.FC = () => {
     if (isLoading) return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin text-primary" /></div>;
     if (!article) return <div className="p-10 text-center text-muted-foreground">Article not found</div>;
 
+    if (article.processingStatus === 'PROCESSING' || article.processingStatus === 'PENDING') {
+        return (
+            <div className="flex flex-col h-screen items-center justify-center bg-background space-y-6 p-6 text-center">
+                <div className="relative">
+                    <div className="absolute inset-0 bg-primary/20 rounded-full blur-2xl animate-pulse"></div>
+                    <Loader2 className="animate-spin text-primary w-16 h-16 relative" />
+                </div>
+                <div className="space-y-2 max-w-md">
+                    <h2 className="text-2xl font-bold tracking-tight">Generating Magic...</h2>
+                    <p className="text-muted-foreground">
+                        We're currently extracting the content and generating your SEO-optimized article. This usually takes less than a minute.
+                    </p>
+                </div>
+                <div className="flex gap-4">
+                    <Button variant="outline" onClick={() => navigate(-1)}>Go Back</Button>
+                    <Button variant="ghost" onClick={() => queryClient.invalidateQueries({ queryKey: ["article", id] })}>Refresh Status</Button>
+                </div>
+            </div>
+        );
+    }
+
+    if (article.processingStatus === 'FAILED') {
+        return (
+            <div className="flex flex-col h-screen items-center justify-center bg-background space-y-6 p-6 text-center">
+                <AlertCircle className="text-destructive w-16 h-16" />
+                <div className="space-y-2 max-w-md">
+                    <h2 className="text-2xl font-bold tracking-tight text-destructive">Processing Failed</h2>
+                    <p className="text-muted-foreground">
+                        Something went wrong during content generation. Please try again or check the source URL.
+                    </p>
+                </div>
+                <Button variant="outline" onClick={() => navigate(-1)}>Go Back</Button>
+            </div>
+        );
+    }
+
     return (
         <motion.div
             initial={{ opacity: 0 }}

@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { generateRssFeed } from '../services/rss';
+import { generateRssFeed } from '../services/rssGenerator';
 
 export const getRssFeed = async (req: Request, res: Response) => {
     try {
