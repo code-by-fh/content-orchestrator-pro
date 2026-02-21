@@ -286,3 +286,20 @@ export const reprocessArticle = async (req: Request, res: Response) => {
         res.status(500).json({ message: 'Failed to re-process article' });
     }
 };
+
+export const uploadImage = async (req: Request, res: Response) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ message: 'No file uploaded' });
+        }
+
+        const fileName = req.file.filename;
+        const baseUrl = process.env.PUBLIC_ARTICLE_BASE_URL || `${req.protocol}://${req.get('host')}`;
+        const imageUrl = `${baseUrl}/uploads/${fileName}`;
+
+        res.json({ imageUrl });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Failed to upload image' });
+    }
+};

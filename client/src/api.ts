@@ -95,7 +95,16 @@ export const unpublishAllFromArticle = async (id: string): Promise<{ message: st
     return response.data;
 };
 
-
+export const uploadImage = async (file: File): Promise<{ imageUrl: string }> => {
+    const formData = new FormData();
+    formData.append('image', file);
+    const response = await api.post('/content/upload-image', formData, {
+        headers: {
+            'Content-Type': 'multipart/form-data',
+        },
+    });
+    return response.data;
+};
 
 export default api;
 

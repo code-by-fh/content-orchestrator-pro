@@ -5,7 +5,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { getArticle, updateArticle, publishToPlatform, unpublishFromPlatform, unpublishAllFromArticle } from '../api';
+import { getArticle, updateArticle, publishToPlatform, unpublishFromPlatform, unpublishAllFromArticle, uploadImage } from '../api';
 import {
     Loader2,
     Link as LinkIcon,
@@ -27,6 +27,7 @@ import {
     AlertCircle,
     Send,
     Zap,
+    ZapOff,
     MousePointer2,
     Linkedin,
     Share2,
@@ -47,6 +48,11 @@ export const ArticleEditor: React.FC = () => {
     const navigate = useNavigate();
     const queryClient = useQueryClient();
     const [content, setContent] = useState('');
+    const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+    const [autoSaveEnabled, setAutoSaveEnabled] = useState(() => {
+        const saved = localStorage.getItem('autoSaveEnabled');
+        return saved !== null ? JSON.parse(saved) : true;
+    });
     const [showUnpublishConfirm, setShowUnpublishConfirm] = useState(false);
 
     const [showInfoSidebar, setShowInfoSidebar] = useState(false);
@@ -93,6 +99,10 @@ export const ArticleEditor: React.FC = () => {
     }, []);
 
     useEffect(() => {
+        localStorage.setItem('autoSaveEnabled', JSON.stringify(autoSaveEnabled));
+    }, [autoSaveEnabled]);
+
+    useEffect(() => {
         if (article) {
             if (article.markdownContent) setContent(article.markdownContent);
             setSeoTitle(article.seoTitle || article.title || '');
@@ -106,6 +116,7 @@ export const ArticleEditor: React.FC = () => {
         mutationFn: (data: Partial<Article> & { status?: string }) => updateArticle(id!, data),
         onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: ['article', id] });
+            setSaveStatus('saved');
             if (variables.status === 'PUBLISHED') {
                 toast.success('Article published successfully!');
             } else if (variables.status === 'SCHEDULED') {
@@ -113,10 +124,16 @@ export const ArticleEditor: React.FC = () => {
             } else if (variables.status === 'DRAFT') {
                 toast.success('Article unpublished (Draft).');
             } else {
-                toast.success('Changes saved successfully!');
+                // Only show toast if it's NOT an auto-save
+                if (!(variables as any).isAutoSave) {
+                    toast.success('Changes saved successfully!');
+                }
             }
+            // Reset to idle after 3 seconds
+            setTimeout(() => setSaveStatus('idle'), 3000);
         },
         onError: () => {
+            setSaveStatus('error');
             toast.error('Failed to save article.');
         }
     });
@@ -175,10 +192,12 @@ export const ArticleEditor: React.FC = () => {
         xingSummary
     });
 
-    const handleSave = () => {
+    const handleSave = (isAutoSave = false) => {
+        setSaveStatus('saving');
         updateMutation.mutate({
             markdownContent: content,
-            ...getMetadataPayload()
+            ...getMetadataPayload(),
+            ...(isAutoSave ? { isAutoSave: true } : {}) as any
         });
     };
 
@@ -221,7 +240,62 @@ export const ArticleEditor: React.FC = () => {
         setShowUnpublishConfirm(false);
     };
 
+    // Auto-save logic
+    useEffect(() => {
+        if (!article || !autoSaveEnabled) return;
 
+        const timer = setTimeout(() => {
+            // Check if anything actually changed compared to the last fetched article
+            const hasChanged =
+                content !== (article.markdownContent || '') ||
+                seoTitle !== (article.seoTitle || article.title || '') ||
+                seoDescription !== (article.seoDescription || '') ||
+                linkedinTeaser !== (article.linkedinTeaser || '') ||
+                xingSummary !== (article.xingSummary || '');
+
+            if (hasChanged && saveStatus !== 'saving') {
+                handleSave(true);
+            }
+        }, 2000);
+
+        return () => clearTimeout(timer);
+    }, [content, seoTitle, seoDescription, linkedinTeaser, xingSummary]);
+
+    const handlePaste = async (e: React.ClipboardEvent) => {
+        const items = e.clipboardData.items;
+        for (let i = 0; i < items.length; i++) {
+            if (items[i].type.indexOf('image') !== -1) {
+                const file = items[i].getAsFile();
+                if (file) {
+                    e.preventDefault();
+
+                    // Insert placeholder
+                    const placeholder = `![Uploading image...]()`;
+                    const textarea = textareaRef.current;
+                    if (!textarea) return;
+
+                    const start = textarea.selectionStart;
+                    const end = textarea.selectionEnd;
+                    const beforeText = content.substring(0, start);
+                    const afterText = content.substring(end);
+
+                    setContent(beforeText + placeholder + afterText);
+
+                    try {
+                        const { imageUrl } = await uploadImage(file);
+                        const finalMarkdown = `![Image](${imageUrl})`;
+
+                        // Replace placeholder with final markdown
+                        setContent(prev => prev.replace(placeholder, finalMarkdown));
+                    } catch (error) {
+                        toast.error('Failed to upload image');
+                        // Remove placeholder on failure
+                        setContent(prev => prev.replace(placeholder, ''));
+                    }
+                }
+            }
+        }
+    };
 
     const insertText = (before: string, after: string = '') => {
         const textarea = textareaRef.current;
@@ -430,12 +504,85 @@ export const ArticleEditor: React.FC = () => {
                         </Button>
                     </motion.div>
 
-                    <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="shrink-0">
-                        <Button variant="ghost" size="sm" onClick={handleSave} disabled={updateMutation.isPending} className="gap-2 px-2 md:px-4">
-                            <Save size={16} />
-                            <span className="hidden md:inline">Save</span>
-                        </Button>
-                    </motion.div>
+                    <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1 bg-muted/30 rounded-lg p-1 border border-border/40 overflow-hidden">
+                            <div className="relative flex items-center h-7 min-w-[70px] md:min-w-[90px] justify-center px-2">
+                                <AnimatePresence mode="wait">
+                                    {saveStatus === 'saving' && (
+                                        <motion.div
+                                            key="saving"
+                                            initial={{ opacity: 0, y: 10 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            exit={{ opacity: 0, y: -10 }}
+                                            className="flex items-center gap-1.5 text-[10px] font-bold text-amber-500 uppercase tracking-tight absolute"
+                                        >
+                                            <Loader2 size={10} className="animate-spin" />
+                                            <span>Saving</span>
+                                        </motion.div>
+                                    )}
+                                    {saveStatus === 'saved' && (
+                                        <motion.div
+                                            key="saved"
+                                            initial={{ opacity: 0, y: 10 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            exit={{ opacity: 0, y: -10 }}
+                                            className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-500 uppercase tracking-tight absolute"
+                                        >
+                                            <CheckCircle2 size={10} />
+                                            <span>Saved</span>
+                                        </motion.div>
+                                    )}
+                                    {saveStatus === 'error' && (
+                                        <motion.div
+                                            key="error"
+                                            initial={{ opacity: 0, y: 10 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            exit={{ opacity: 0, y: -10 }}
+                                            className="flex items-center gap-1.5 text-[10px] font-bold text-destructive uppercase tracking-tight absolute"
+                                        >
+                                            <AlertCircle size={10} />
+                                            <span>Error</span>
+                                        </motion.div>
+                                    )}
+                                    {saveStatus === 'idle' && (
+                                        <motion.div
+                                            key="save-btn"
+                                            initial={{ opacity: 0, y: 10 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            exit={{ opacity: 0, y: -10 }}
+                                            className="shrink-0 absolute"
+                                        >
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => handleSave(false)}
+                                                disabled={updateMutation.isPending}
+                                                className="gap-2 px-1 md:px-2 h-6 hover:bg-transparent"
+                                            >
+                                                <Save size={14} />
+                                                <span className="text-xs font-semibold">Save</span>
+                                            </Button>
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
+                            </div>
+
+                            <div className="w-px h-4 bg-border/40 shrink-0" />
+
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className={cn(
+                                    "h-7 w-7 shrink-0 transition-colors rounded-md",
+                                    autoSaveEnabled ? "text-amber-500 bg-amber-500/10" : "text-muted-foreground"
+                                )}
+                                onClick={() => setAutoSaveEnabled(!autoSaveEnabled)}
+                                title={autoSaveEnabled ? "Disable Auto-Save" : "Enable Auto-Save"}
+                            >
+                                {autoSaveEnabled ? <Zap size={14} fill="currentColor" /> : <ZapOff size={14} />}
+                            </Button>
+                        </div>
+                    </div>
 
 
 
@@ -485,6 +632,7 @@ export const ArticleEditor: React.FC = () => {
                                             <textarea
                                                 ref={textareaRef}
                                                 onScroll={handleEditorScroll}
+                                                onPaste={handlePaste}
                                                 value={content}
                                                 onChange={(e) => setContent(e.target.value)}
                                                 placeholder="Start writing your masterpiece..."
@@ -516,6 +664,10 @@ export const ArticleEditor: React.FC = () => {
                                                         h2: ({ node, ...props }) => <h2 {...props} className="text-foreground dark:text-white font-bold mt-8 mb-4" />,
                                                         h3: ({ node, ...props }) => <h3 {...props} className="text-foreground dark:text-white font-semibold mt-6 mb-3" />,
                                                         strong: ({ node, ...props }) => <strong {...props} className="text-foreground dark:text-white font-bold" />,
+                                                        img: ({ node, ...props }) => {
+                                                            if (!props.src) return <span className="inline-flex items-center gap-2 text-muted-foreground italic text-sm animate-pulse"><Loader2 size={14} className="animate-spin" /> Uploading image...</span>;
+                                                            return <img {...props} className="rounded-xl border border-border/40 shadow-lg my-8" />;
+                                                        },
                                                         code(props) {
                                                             const { children, className, node, ref, ...rest } = props
                                                             const match = /language-(\w+)/.exec(className || '')

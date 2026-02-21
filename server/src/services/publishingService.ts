@@ -1,12 +1,116 @@
-import { PrismaClient, Platform, Article } from '@prisma/client';
-import { PlatformAdapter } from './adapters/types';
-import { XingAdapter } from './adapters/xingAdapter';
+import { Platform, PrismaClient } from '@prisma/client';
+import fs from 'fs';
+import path from 'path';
 import { LinkedInAdapter } from './adapters/linkedinAdapter';
-import { RssAdapter } from './adapters/rssAdapter';
 import { MediumAdapter } from './adapters/mediumAdapter';
+import { RssAdapter } from './adapters/rssAdapter';
+import { PlatformAdapter } from './adapters/types';
 import { WebhookAdapter } from './adapters/webhookAdapter';
+import { XingAdapter } from './adapters/xingAdapter';
 
 const prisma = new PrismaClient();
+
+async function processImages(articleId: string, markdownContent: string | null, language: string, articleTitle: string): Promise<string | null> {
+    console.log('Processing images for article', articleId);
+    const cmsUrl = process.env.CONTENT_MANAGEMENT_IMAGE_URL;
+    const cmsToken = process.env.CONTENT_MANAGEMENT_TOKEN;
+
+    if (!cmsUrl || !cmsToken || !markdownContent) {
+        return markdownContent;
+    }
+
+    const imageRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
+    let newMarkdownContent = markdownContent;
+    let hasChanges = false;
+
+    const matches = Array.from(markdownContent.matchAll(imageRegex));
+
+    for (const match of matches) {
+        const fullMatch = match[0];
+        const altText = match[1];
+        const url = match[2];
+
+        if (url.includes('/uploads/')) {
+            try {
+                const fileName = url.substring(url.lastIndexOf('/') + 1);
+                const filePath = path.join(__dirname, '../../uploads', fileName);
+
+                if (!fs.existsSync(filePath)) {
+                    console.error(`Local file not found for upload: ${filePath}`);
+                    continue;
+                }
+
+                const baseUrl = new URL(cmsUrl).origin;
+                const ext = path.extname(fileName).toLowerCase();
+
+                let mimeType = 'application/octet-stream';
+                if (ext === '.jpg' || ext === '.jpeg') mimeType = 'image/jpeg';
+                else if (ext === '.png') mimeType = 'image/png';
+                else if (ext === '.gif') mimeType = 'image/gif';
+                else if (ext === '.webp') mimeType = 'image/webp';
+                else if (ext === '.svg') mimeType = 'image/svg+xml';
+
+                let baseName = (altText && altText.length > 2 && altText.toLowerCase() !== 'image') ? altText : articleTitle;
+                const seoName = baseName.toLowerCase()
+                    .replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss')
+                    .replace(/[^a-z0-9]+/g, '-')
+                    .replace(/(^-|-$)/g, '');
+
+                const seoFileName = `${seoName}${ext}`;
+
+                // Read local file into a Blob for native fetch multipart upload
+                const fileBuffer = await fs.promises.readFile(filePath);
+                const blob = new Blob([fileBuffer], { type: mimeType });
+
+                const formData = new FormData();
+                formData.append('title', altText || articleTitle);
+                formData.append('filename_download', seoFileName);
+                formData.append('file', blob, seoFileName);
+
+                const response = await fetch(cmsUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${cmsToken}`
+                    },
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Request failed with status code ${response.status}`);
+                }
+
+                const result = await response.json();
+                const imageId = result?.data?.id;
+
+                if (imageId) {
+                    const newImageUrl = `${baseUrl}/assets/${imageId}/${seoFileName}`;
+                    newMarkdownContent = newMarkdownContent.replace(fullMatch, `![${altText}](${newImageUrl})`);
+                    hasChanges = true;
+
+                    try {
+                        if (fs.existsSync(filePath)) {
+                            fs.promises.unlink(filePath).catch(e => console.error('Failed to unlink local image:', e));
+                        }
+                    } catch (e) {
+                        console.error('Failed to delete local file', e);
+                    }
+                }
+            } catch (error: any) {
+                console.error(`Failed to upload local image ${url} to CMS:`, error.message);
+            }
+        }
+    }
+
+    if (hasChanges) {
+        if (language === 'EN') {
+            await (prisma.article as any).update({ where: { id: articleId }, data: { markdownContentEn: newMarkdownContent } });
+        } else {
+            await prisma.article.update({ where: { id: articleId }, data: { markdownContent: newMarkdownContent } });
+        }
+    }
+
+    return newMarkdownContent;
+}
 
 class PublishingService {
     private adapters: Map<Platform, PlatformAdapter> = new Map();
@@ -62,6 +166,9 @@ class PublishingService {
             linkedinTeaser: language === 'EN' ? (article.linkedinTeaserEn || article.linkedinTeaser) : article.linkedinTeaser,
             xingSummary: language === 'EN' ? (article.xingSummaryEn || article.xingSummary) : article.xingSummary,
         };
+
+        const newMarkdown = await processImages(articleId, publishedArticle.markdownContent, language, publishedArticle.title);
+        publishedArticle.markdownContent = newMarkdown;
 
         const result = await adapter.publish(publishedArticle as any, accessToken, language);
 

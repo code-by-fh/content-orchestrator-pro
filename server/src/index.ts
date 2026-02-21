@@ -17,7 +17,9 @@ initScheduler();
 const app = express();
 const port = process.env.PORT || 3003;
 
-app.use(helmet());
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" }
+}));
 app.use(cors({
   origin: true,
   credentials: true
@@ -33,6 +35,15 @@ app.use('/api', distributionRoutes);
 
 // Serve static files from client/dist
 const clientDist = path.join(__dirname, '../../client/dist');
+const uploadsPath = path.join(__dirname, '../uploads');
+
+// Ensure uploads directory exists
+import fs from 'fs';
+if (!fs.existsSync(uploadsPath)) {
+  fs.mkdirSync(uploadsPath, { recursive: true });
+}
+
+app.use('/uploads', express.static(uploadsPath));
 app.use(express.static(clientDist));
 
 // Handle SPA routing
