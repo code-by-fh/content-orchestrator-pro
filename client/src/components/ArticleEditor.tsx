@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import rehypeRaw from 'rehype-raw';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { getArticle, updateArticle, publishToPlatform, unpublishFromPlatform, unpublishAllFromArticle, uploadImage } from '../api';
@@ -31,7 +32,11 @@ import {
     MousePointer2,
     Linkedin,
     Share2,
-    Globe
+    Globe,
+    HelpCircle,
+    AlignCenter,
+    AlignLeft,
+    AlignRight
 } from 'lucide-react';
 
 import { Button } from './ui/Button';
@@ -41,6 +46,8 @@ import { cn } from '../lib/utils';
 import type { Article } from '../types';
 import { Panel, Group, Separator } from 'react-resizable-panels';
 import { ConfirmationModal } from './ui/ConfirmationModal';
+import { Tooltip } from './ui/Tooltip';
+
 
 
 export const ArticleEditor: React.FC = () => {
@@ -283,7 +290,7 @@ export const ArticleEditor: React.FC = () => {
 
                     try {
                         const { imageUrl } = await uploadImage(file);
-                        const finalMarkdown = `![Image](${imageUrl})`;
+                        const finalMarkdown = `![Image](${imageUrl}#width60-center)`;
 
                         // Replace placeholder with final markdown
                         setContent(prev => prev.replace(placeholder, finalMarkdown));
@@ -312,6 +319,45 @@ export const ArticleEditor: React.FC = () => {
             textarea.focus();
             textarea.setSelectionRange(start + before.length, end + before.length);
         }, 0);
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+        if (e.ctrlKey || e.metaKey) {
+            switch (e.key.toLowerCase()) {
+                case 'b':
+                    e.preventDefault();
+                    insertText('**', '**');
+                    break;
+                case 'i':
+                    e.preventDefault();
+                    insertText('*', '*');
+                    break;
+                case 'k':
+                    e.preventDefault();
+                    insertText('[', '](url)');
+                    break;
+                case 's':
+                    e.preventDefault();
+                    handleSave(false);
+                    break;
+                case '1':
+                    e.preventDefault();
+                    insertText('# ');
+                    break;
+                case '2':
+                    e.preventDefault();
+                    insertText('## ');
+                    break;
+                case '3':
+                    e.preventDefault();
+                    insertText('### ');
+                    break;
+                case 'l':
+                    e.preventDefault();
+                    insertText('- ');
+                    break;
+            }
+        }
     };
 
     const handleEditorScroll = (e: React.UIEvent<HTMLTextAreaElement>) => {
@@ -351,6 +397,29 @@ export const ArticleEditor: React.FC = () => {
         setTimeout(() => {
             isScrollingRef.current = false;
         }, 10);
+    };
+
+    const applyTextAlign = (align: 'left' | 'center' | 'right') => {
+        const textarea = textareaRef.current;
+        if (!textarea) return;
+
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+        const selectedText = content.substring(start, end);
+
+        if (selectedText) {
+            const before = `<div align="${align}">\n`;
+            const after = `\n</div>`;
+            const newText = content.substring(0, start) + before + selectedText + after + content.substring(end);
+            setContent(newText);
+
+            setTimeout(() => {
+                textarea.focus();
+                textarea.setSelectionRange(start + before.length, start + before.length + selectedText.length);
+            }, 0);
+        } else {
+            insertText(`<div align="${align}">\n`, `\n</div>`);
+        }
     };
 
     if (isLoading) return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin text-primary" /></div>;
@@ -401,9 +470,12 @@ export const ArticleEditor: React.FC = () => {
             {/* Responsive Toolbar */}
             <header className="h-16 md:h-16 flex items-center justify-between px-4 md:px-6 border-b border-border/40 backdrop-blur-xl bg-background/80 sticky top-0 z-40">
                 <div className="flex items-center gap-3 md:gap-4 overflow-hidden">
-                    <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="hover:bg-muted text-muted-foreground shrink-0">
-                        <ArrowLeft size={18} />
-                    </Button>
+                    <Tooltip content="Go back" side="bottom">
+                        <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="hover:bg-muted text-muted-foreground shrink-0">
+                            <ArrowLeft size={18} />
+                        </Button>
+                    </Tooltip>
+
                     <div className="min-w-0 flex-1">
                         <h1 className="text-sm font-semibold text-foreground truncate max-w-[120px] md:max-w-md">{article.title}</h1>
                         <div className="flex items-center gap-2">
@@ -421,23 +493,24 @@ export const ArticleEditor: React.FC = () => {
                                             .map((pub) => {
                                                 const platform = pub.platform.toUpperCase();
                                                 return (
-                                                    <div
-                                                        key={pub.id}
-                                                        title={`Published on ${platform}`}
-                                                        className={cn(
-                                                            "p-1 rounded bg-muted/30 text-muted-foreground hover:text-foreground transition-colors shrink-0",
-                                                            platform === 'LINKEDIN' && "hover:text-[#0077b5]",
-                                                            platform === 'XING' && "hover:text-[#026466]",
-                                                            platform === 'RSS' && "hover:text-orange-500",
-                                                            platform === 'WEBHOOK' && "hover:text-blue-500"
-                                                        )}
-                                                    >
-                                                        {platform === 'LINKEDIN' ? <Linkedin size={10} /> :
-                                                            platform === 'XING' ? <Share2 size={10} /> :
-                                                                platform === 'RSS' ? <Globe size={10} /> :
-                                                                    platform === 'WEBHOOK' ? <Globe size={10} /> :
-                                                                        <UploadCloud size={10} />}
-                                                    </div>
+                                                    <Tooltip key={pub.id} content={`Published on ${platform}`} side="bottom">
+                                                        <div
+                                                            className={cn(
+                                                                "p-1 rounded bg-muted/30 text-muted-foreground hover:text-foreground transition-colors shrink-0",
+                                                                platform === 'LINKEDIN' && "hover:text-[#0077b5]",
+                                                                platform === 'XING' && "hover:text-[#026466]",
+                                                                platform === 'RSS' && "hover:text-orange-500",
+                                                                platform === 'WEBHOOK' && "hover:text-blue-500"
+                                                            )}
+                                                        >
+                                                            {platform === 'LINKEDIN' ? <Linkedin size={10} /> :
+                                                                platform === 'XING' ? <Share2 size={10} /> :
+                                                                    platform === 'RSS' ? <Globe size={10} /> :
+                                                                        platform === 'WEBHOOK' ? <Globe size={10} /> :
+                                                                            <UploadCloud size={10} />}
+                                                        </div>
+                                                    </Tooltip>
+
                                                 );
                                             })}
                                     </div>
@@ -462,47 +535,55 @@ export const ArticleEditor: React.FC = () => {
                 <div className="flex items-center gap-2 md:gap-3 overflow-x-auto no-scrollbar pl-2">
                     {/* Layout Controls - Hidden on strict mobile, visible on desktop/tablet */}
                     <div className="hidden md:flex items-center gap-1 bg-muted/30 rounded-lg p-1 mr-2 border border-border/40">
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7"
-                            onClick={() => setIsSwapped(!isSwapped)}
-                            title="Swap Editor/Preview"
-                        >
-                            <Repeat size={14} className={cn("transition-transform duration-500", isSwapped && "rotate-180")} />
-                        </Button>
+                        <Tooltip content="Swap Editor/Preview">
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7"
+                                onClick={() => setIsSwapped(!isSwapped)}
+                            >
+                                <Repeat size={14} className={cn("transition-transform duration-500", isSwapped && "rotate-180")} />
+                            </Button>
+                        </Tooltip>
+
                         <div className="w-px h-4 bg-border/40" />
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className={cn("h-7 w-7", orientation === 'horizontal' && "bg-background/80 shadow-sm")}
-                            onClick={() => setOrientation('horizontal')}
-                            title="Side-by-Side"
-                        >
-                            <Columns size={14} />
-                        </Button>
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className={cn("h-7 w-7", orientation === 'vertical' && "bg-background/80 shadow-sm")}
-                            onClick={() => setOrientation('vertical')}
-                            title="Stacked"
-                        >
-                            <Rows size={14} />
-                        </Button>
+                        <Tooltip content="Side-by-Side">
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className={cn("h-7 w-7", orientation === 'horizontal' && "bg-background/80 shadow-sm")}
+                                onClick={() => setOrientation('horizontal')}
+                            >
+                                <Columns size={14} />
+                            </Button>
+                        </Tooltip>
+                        <Tooltip content="Stacked">
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className={cn("h-7 w-7", orientation === 'vertical' && "bg-background/80 shadow-sm")}
+                                onClick={() => setOrientation('vertical')}
+                            >
+                                <Rows size={14} />
+                            </Button>
+                        </Tooltip>
+
                     </div>
 
                     <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="shrink-0">
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setShowInfoSidebar(!showInfoSidebar)}
-                            className={cn("gap-2 px-2 md:px-4", showInfoSidebar && "bg-indigo-500/10 text-indigo-500")}
-                        >
-                            <LinkIcon size={16} />
-                            <span className="hidden md:inline">Info</span>
-                        </Button>
+                        <Tooltip content="Toggle Info Sidebar" side="bottom">
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setShowInfoSidebar(!showInfoSidebar)}
+                                className={cn("gap-2 px-2 md:px-4", showInfoSidebar && "bg-indigo-500/10 text-indigo-500")}
+                            >
+                                <LinkIcon size={16} />
+                                <span className="hidden md:inline">Info</span>
+                            </Button>
+                        </Tooltip>
                     </motion.div>
+
 
                     <div className="flex items-center gap-2">
                         <div className="flex items-center gap-1 bg-muted/30 rounded-lg p-1 border border-border/40 overflow-hidden">
@@ -569,18 +650,20 @@ export const ArticleEditor: React.FC = () => {
 
                             <div className="w-px h-4 bg-border/40 shrink-0" />
 
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                className={cn(
-                                    "h-7 w-7 shrink-0 transition-colors rounded-md",
-                                    autoSaveEnabled ? "text-amber-500 bg-amber-500/10" : "text-muted-foreground"
-                                )}
-                                onClick={() => setAutoSaveEnabled(!autoSaveEnabled)}
-                                title={autoSaveEnabled ? "Disable Auto-Save" : "Enable Auto-Save"}
-                            >
-                                {autoSaveEnabled ? <Zap size={14} fill="currentColor" /> : <ZapOff size={14} />}
-                            </Button>
+                            <Tooltip content={autoSaveEnabled ? "Disable Auto-Save" : "Enable Auto-Save"}>
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className={cn(
+                                        "h-7 w-7 shrink-0 transition-colors rounded-md",
+                                        autoSaveEnabled ? "text-amber-500 bg-amber-500/10" : "text-muted-foreground"
+                                    )}
+                                    onClick={() => setAutoSaveEnabled(!autoSaveEnabled)}
+                                >
+                                    {autoSaveEnabled ? <Zap size={14} fill="currentColor" /> : <ZapOff size={14} />}
+                                </Button>
+                            </Tooltip>
+
                         </div>
                     </div>
 
@@ -617,13 +700,18 @@ export const ArticleEditor: React.FC = () => {
                                     <Panel defaultSize={50} minSize={20} className="flex flex-col relative group">
                                         {/* Floating Formatting Toolbar - Repositioned for mobile */}
                                         <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-1 p-1.5 rounded-full bg-foreground/5 backdrop-blur-md border border-white/10 shadow-xl opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-2 group-hover:translate-y-0 z-30 max-w-[90%] overflow-x-auto no-scrollbar">
-                                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-background/50 shrink-0" onClick={() => insertText('**', '**')}><Bold size={14} /></Button>
-                                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-background/50 shrink-0" onClick={() => insertText('*', '*')}><Italic size={14} /></Button>
-                                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-background/50 shrink-0" onClick={() => insertText('## ')}><Heading2 size={14} /></Button>
-                                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-background/50 shrink-0" onClick={() => insertText('- ')}><List size={14} /></Button>
-                                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-background/50 shrink-0" onClick={() => insertText('`', '`')}><Code size={14} /></Button>
-                                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-background/50 shrink-0" onClick={() => insertText('[', '](url)')}><LinkIcon size={14} /></Button>
+                                            <Tooltip content="Bold (Ctrl+B)"><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-background/50 shrink-0" onClick={() => insertText('**', '**')}><Bold size={14} /></Button></Tooltip>
+                                            <Tooltip content="Italic (Ctrl+I)"><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-background/50 shrink-0" onClick={() => insertText('*', '*')}><Italic size={14} /></Button></Tooltip>
+                                            <Tooltip content="Heading 2"><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-background/50 shrink-0" onClick={() => insertText('## ')}><Heading2 size={14} /></Button></Tooltip>
+                                            <Tooltip content="Bullet List"><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-background/50 shrink-0" onClick={() => insertText('- ')}><List size={14} /></Button></Tooltip>
+                                            <Tooltip content="Code"><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-background/50 shrink-0" onClick={() => insertText('`', '`')}><Code size={14} /></Button></Tooltip>
+                                            <Tooltip content="Link (Ctrl+K)"><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-background/50 shrink-0" onClick={() => insertText('[', '](url)')}><LinkIcon size={14} /></Button></Tooltip>
+                                            <div className="w-px h-4 bg-white/10 mx-1 shrink-0" />
+                                            <Tooltip content="Align Left"><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-background/50 shrink-0" onClick={() => applyTextAlign('left')}><AlignLeft size={14} /></Button></Tooltip>
+                                            <Tooltip content="Align Center"><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-background/50 shrink-0" onClick={() => applyTextAlign('center')}><AlignCenter size={14} /></Button></Tooltip>
+                                            <Tooltip content="Align Right"><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-background/50 shrink-0" onClick={() => applyTextAlign('right')}><AlignRight size={14} /></Button></Tooltip>
                                         </div>
+
 
                                         <div className="flex-1 flex flex-col relative bg-background">
                                             <div className="absolute top-4 left-4 z-10 px-2 py-1 rounded bg-muted/50 text-[9px] uppercase tracking-widest font-bold text-muted-foreground pointer-events-none">
@@ -633,10 +721,14 @@ export const ArticleEditor: React.FC = () => {
                                                 ref={textareaRef}
                                                 onScroll={handleEditorScroll}
                                                 onPaste={handlePaste}
+                                                onKeyDown={handleKeyDown}
                                                 value={content}
                                                 onChange={(e) => setContent(e.target.value)}
                                                 placeholder="Start writing your masterpiece..."
-                                                className="flex-1 w-full p-4 md:p-8 resize-none bg-transparent focus:outline-none font-mono text-sm leading-relaxed text-foreground/80 placeholder:text-muted-foreground/30 selection:bg-indigo-500/20 custom-scrollbar"
+                                                className="flex-1 w-full p-4 pb-[7vh] pt-[5vh] resize-none bg-transparent focus:outline-none font-mono text-sm leading-relaxed text-foreground/80 placeholder:text-muted-foreground/30 selection:bg-indigo-500/20 custom-scrollbar"
+
+
+
                                             />
                                         </div>
                                     </Panel>
@@ -652,13 +744,14 @@ export const ArticleEditor: React.FC = () => {
                                             onScroll={handlePreviewScroll}
                                             className="h-full overflow-y-scroll custom-scrollbar"
                                         >
-                                            <div className="max-w-5xl mx-auto py-8 md:py-12 px-4 md:px-8
+                                            <div className="max-w-5xl mx-auto pb-[7vh] pt-[5vh] px-4 md:px-8
                                                 prose prose-slate dark:prose-invert
                                                 text-foreground/80 dark:text-gray-100
                                                 dark:prose-headings:text-white
                                                 prose-sm md:prose-base">
                                                 <ReactMarkdown
                                                     remarkPlugins={[remarkGfm]}
+                                                    rehypePlugins={[rehypeRaw]}
                                                     components={{
                                                         h1: ({ node, ...props }) => <h1 {...props} className="text-foreground dark:text-white font-bold border-b border-border/50 pb-2 mb-6" />,
                                                         h2: ({ node, ...props }) => <h2 {...props} className="text-foreground dark:text-white font-bold mt-8 mb-4" />,
@@ -666,7 +759,29 @@ export const ArticleEditor: React.FC = () => {
                                                         strong: ({ node, ...props }) => <strong {...props} className="text-foreground dark:text-white font-bold" />,
                                                         img: ({ node, ...props }) => {
                                                             if (!props.src) return <span className="inline-flex items-center gap-2 text-muted-foreground italic text-sm animate-pulse"><Loader2 size={14} className="animate-spin" /> Uploading image...</span>;
-                                                            return <img {...props} className="rounded-xl border border-border/40 shadow-lg my-8" />;
+
+                                                            // Parse width and alignment from fragment (e.g. #width50-center)
+                                                            const fragment = props.src.split('#')[1] || '';
+                                                            const widthMatch = fragment.match(/width(\d+)/);
+                                                            const alignMatch = fragment.match(/(left|center|right)/);
+
+                                                            const width = widthMatch ? `${widthMatch[1]}%` : '100%';
+                                                            const align = alignMatch ? alignMatch[1] : 'center';
+
+                                                            const alignmentClasses = {
+                                                                left: 'mr-auto ml-0',
+                                                                center: 'mx-auto',
+                                                                right: 'ml-auto mr-0'
+                                                            }[align];
+
+                                                            return (
+                                                                <div className={cn("flex my-8", alignmentClasses)} style={{ width }}>
+                                                                    <img
+                                                                        {...props}
+                                                                        className="rounded-xl border border-border/40 shadow-lg w-full h-auto"
+                                                                    />
+                                                                </div>
+                                                            );
                                                         },
                                                         li: ({ node, ...props }) => <li {...props} className="block mb-2" />,
                                                         code(props) {
@@ -935,8 +1050,47 @@ const InfoPanelContent = ({
                     </div>
                 </section>
 
+                {/* Shortcut Help Section */}
+                <section className="space-y-4 pt-2">
+                    <h4 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                        <HelpCircle size={16} className="text-amber-500" />
+                        Keyboard Shortcuts
+                    </h4>
+                    <div className="grid grid-cols-1 gap-2 bg-muted/20 rounded-xl p-4 border border-border/40">
+                        <div className="flex justify-between items-center text-xs">
+                            <span className="text-muted-foreground">Bold</span>
+                            <kbd className="px-2 py-1 bg-background border border-border rounded text-[10px] font-mono shadow-sm">Ctrl + B</kbd>
+                        </div>
+                        <div className="flex justify-between items-center text-xs">
+                            <span className="text-muted-foreground">Italic</span>
+                            <kbd className="px-2 py-1 bg-background border border-border rounded text-[10px] font-mono shadow-sm">Ctrl + I</kbd>
+                        </div>
+                        <div className="flex justify-between items-center text-xs">
+                            <span className="text-muted-foreground">Insert Link</span>
+                            <kbd className="px-2 py-1 bg-background border border-border rounded text-[10px] font-mono shadow-sm">Ctrl + K</kbd>
+                        </div>
+                        <div className="flex justify-between items-center text-xs">
+                            <span className="text-muted-foreground">Save Article</span>
+                            <kbd className="px-2 py-1 bg-background border border-border rounded text-[10px] font-mono shadow-sm">Ctrl + S</kbd>
+                        </div>
+                        <div className="flex justify-between items-center text-xs">
+                            <span className="text-muted-foreground">Heading 1/2/3</span>
+                            <kbd className="px-2 py-1 bg-background border border-border rounded text-[10px] font-mono shadow-sm">Ctrl + 1/2/3</kbd>
+                        </div>
+                        <div className="flex justify-between items-center text-xs">
+                            <span className="text-muted-foreground">Bullet List</span>
+                            <kbd className="px-2 py-1 bg-background border border-border rounded text-[10px] font-mono shadow-sm">Ctrl + L</kbd>
+                        </div>
+                        <div className="pt-2 border-t border-border/40 mt-1">
+                            <p className="text-[10px] text-muted-foreground italic">
+                                Images: use <code className="text-indigo-400">#width50-center</code> at the end of the URL to resize and align.
+                            </p>
+                        </div>
+                    </div>
+                </section>
+
                 {/* Action Buttons for Sidebar */}
-                <div className="pt-6 space-y-3 pb-8">
+                <div className="pt-2 space-y-3 pb-8">
                     <Button
                         className="w-full h-10 justify-start gap-3 bg-muted/50 hover:bg-muted text-muted-foreground border border-border/50"
                         variant="ghost"
