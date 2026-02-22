@@ -3,7 +3,7 @@ export type Platform = 'XING' | 'LINKEDIN' | 'MEDIUM' | 'RSS' | 'WEBHOOK';
 
 export type PublicationStatus = 'PENDING' | 'PUBLISHED' | 'ERROR';
 
-export type ProcessingStatus = 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
+export type ProcessingStatus = 'PENDING' | 'PROCESSING' | 'DRAFT' | 'FAILED';
 
 export type Language = 'DE' | 'EN';
 

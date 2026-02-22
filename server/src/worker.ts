@@ -77,7 +77,7 @@ async function generateArticleContent(rawText: string): Promise<ValidatedArticle
             - Strukturiere den Text logisch und lesefreundlich
             - Vermeide Wiederholungen
             - Halte dich an die deutsche Sprache
-            - Für alle Fakten und Behauptungen MUSS ein Nachweis dem Text hinzugefügt werden! Der Nachweis soll durch eckige Klammern [1] markiert sein. Alle Nachweise werden am Ende des Textes in einer sauberen Markdown-Liste (Aufzählung untereinander) aufgeführt.
+            - Halte dich an die Fakten und Behauptungen des Transkripts und haluziniere keine Fakten oder Behauptungen!
             - Bilder im Markdown können durch URL-Fragmente gesteuert werden: Nutze ![Alt-Text](url#width50-center) für 50% Breite und Zentrierung. Mögliche Werte für Alignment: left, center, right. Standard ist width100-center.
             
             Input:
@@ -137,7 +137,7 @@ const worker = new Worker('content-queue', async (job: Job) => {
                 const execStart = performance.now();
                 exec(`python "${scriptPath}" "${videoId}"`, (error, stdout, stderr) => {
                     if (error) {
-                        console.error(`[Extraction Error] Python script failed after ${(performance.now() - execStart).toFixed(2)}ms: \${stderr}`);
+                        console.error(`[Extraction Error] Python script failed after ${(performance.now() - execStart).toFixed(2)}ms: ${stderr}`);
                         return reject(new Error(stderr));
                     }
                     const res = JSON.parse(stdout);
@@ -149,15 +149,15 @@ const worker = new Worker('content-queue', async (job: Job) => {
         }
 
         const extractionTime = performance.now() - extractionStart;
-        console.log(`✅ [Step 1: Extraction] Completed in \${extractionTime.toFixed(2)}ms. Extracted \${rawText.length} characters.`);
+        console.log(`✅ [Step 1: Extraction] Completed in ${extractionTime.toFixed(2)}ms. Extracted ${rawText.length} characters.`);
 
         // --- Step 2: AI Generation ---
-        console.log(`\n🧠 [Step 2: AI Generation] Sending content to Gemini...`);
+        console.log(`\n🧠 [Step 2: AI Generation] Sending ${rawText.length} characters to Gemini...`);
         const generationStart = performance.now();
         const validatedData = await generateArticleContent(rawText);
         const generationTime = performance.now() - generationStart;
 
-        console.log(`✅ [Step 2: AI Generation] Completed in \${generationTime.toFixed(2)}ms.`);
+        console.log(`✅ [Step 2: AI Generation] Completed in ${generationTime.toFixed(2)}ms.`);
 
         // --- Step 3: Database Update ---
         console.log(`\n💾 [Step 3: DB Update] Saving results to database...`);
@@ -175,12 +175,12 @@ const worker = new Worker('content-queue', async (job: Job) => {
                 slug: validatedData.slug,
                 category: validatedData.category,
                 rawTranscript: rawText,
-                processingStatus: 'COMPLETED'
+                processingStatus: 'DRAFT'
             },
         });
 
         const finalDbTime = performance.now() - finalDbStart;
-        console.log(`✅ [Step 3: DB Update] Completed in \${finalDbTime.toFixed(2)}ms.`);
+        console.log(`✅ [Step 3: DB Update] Completed in ${finalDbTime.toFixed(2)}ms.`);
 
         // --- Summary ---
         const totalJobTime = performance.now() - jobStartTime;
@@ -194,14 +194,14 @@ const worker = new Worker('content-queue', async (job: Job) => {
         const longestStep = steps.reduce((prev, current) => (prev.duration > current.duration) ? prev : current);
 
         console.log(`\n📊 ========== GENERATION SUMMARY ==========`);
-        console.log(`Total Time:      \${totalJobTime.toFixed(2)}ms`);
-        console.log(`Longest Step:    \${longestStep.name} (\${longestStep.duration.toFixed(2)}ms)`);
+        console.log(`Total Time:      ${totalJobTime.toFixed(2)}ms`);
+        console.log(`Longest Step:    ${longestStep.name} (${longestStep.duration.toFixed(2)}ms)`);
         console.table(steps.map(s => ({ Step: s.name, "Duration (ms)": s.duration.toFixed(2) })));
         console.log(`===========================================\n`);
 
     } catch (error: any) {
         const totalFailTime = performance.now() - jobStartTime;
-        console.error(`\n❌ [Job Failed] Failed after \${totalFailTime.toFixed(2)}ms: \${error.message}`);
+        console.error(`\n❌ [Job Failed] Failed after ${totalFailTime.toFixed(2)}ms: ${error.message}`);
 
         try {
             await prisma.article.update({

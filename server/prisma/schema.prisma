@@ -41,7 +41,7 @@ enum PublicationStatus {
 enum ProcessingStatus {
   PENDING
   PROCESSING
-  COMPLETED
+  DRAFT
   FAILED
 }
 

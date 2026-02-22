@@ -43,6 +43,11 @@ export const ArticleList: React.FC = () => {
         queryFn: ({ pageParam = 1 }) => getArticles(pageParam as number, 10, debouncedSearchQuery, showOnlyPublished),
         getNextPageParam: (lastPage) => lastPage.meta.nextPage,
         initialPageParam: 1,
+        refetchInterval: (query) => {
+            const articles = query.state.data?.pages.flatMap(page => page.data) || [];
+            const hasProcessing = articles.some(a => a.processingStatus === 'PROCESSING' || a.processingStatus === 'PENDING');
+            return hasProcessing ? 3000 : false;
+        }
     });
 
     const { ref: inViewRef, inView } = useInView();
@@ -418,7 +423,7 @@ const ArticleActions = ({
                     {isUnpublishing ? <Loader2 size={16} className="animate-spin" /> : <Undo2 size={16} />}
                 </Button>
             )}
-            {(article.processingStatus === 'FAILED' || article.processingStatus === 'COMPLETED') && (
+            {(article.processingStatus === 'FAILED' || article.processingStatus === 'DRAFT') && (
                 <Button
                     variant="ghost"
                     size="icon"

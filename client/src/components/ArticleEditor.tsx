@@ -90,6 +90,10 @@ export const ArticleEditor: React.FC = () => {
         queryKey: ['article', id],
         queryFn: () => getArticle(id!),
         enabled: !!id,
+        refetchInterval: (query) => {
+            const status = query.state.data?.processingStatus;
+            return (status === 'PROCESSING' || status === 'PENDING') ? 3000 : false;
+        }
     });
 
     useEffect(() => {
