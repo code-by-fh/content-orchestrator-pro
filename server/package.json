@@ -5,7 +5,7 @@
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
-    "dev": "concurrently \"nodemon src/index.ts\" \"nodemon src/worker.ts\"",
+    "dev": "nodemon src/index.ts",
     "worker": "ts-node src/worker.ts",
     "seed": "ts-node prisma/seed.ts",
     "db:wipe": "ts-node scripts/wipe-db.ts"

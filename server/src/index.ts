@@ -11,12 +11,11 @@ import { initScheduler } from './services/scheduler';
 
 dotenv.config();
 
-// Initialize Scheduler
+// Initialize Scheduler and Worker
 initScheduler();
+import './worker';
 
 const app = express();
-// Enable trust proxy so rate limit works correctly behind proxies (e.g. Docker/Nginx/CapRover)
-app.set('trust proxy', 1);
 const port = process.env.PORT || 3003;
 
 app.use(helmet({
@@ -35,6 +34,8 @@ app.use('/api/auth', authRoutes);
 app.use('/api/content', contentRoutes);
 app.use('/api', distributionRoutes);
 
+// Serve static files from client/dist
+const clientDist = path.join(__dirname, '../../client/dist');
 const uploadsPath = path.join(__dirname, '../uploads');
 
 // Ensure uploads directory exists
@@ -44,10 +45,14 @@ if (!fs.existsSync(uploadsPath)) {
 }
 
 app.use('/uploads', express.static(uploadsPath));
+app.use(express.static(clientDist));
 
-// Handle all other routing
-app.use('*', (req, res) => {
-  res.status(404).json({ message: 'API endpoint not found' });
+// Handle SPA routing
+app.get('*', (req, res) => {
+  if (req.path.startsWith('/api')) {
+    return res.status(404).json({ message: 'API endpoint not found' });
+  }
+  res.sendFile(path.join(clientDist, 'index.html'));
 });
 
 app.listen(port, () => {
