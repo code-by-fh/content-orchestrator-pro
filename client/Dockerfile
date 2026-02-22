@@ -1,4 +1,4 @@
-FROM node:18-alpine AS builder
+FROM node:20-alpine AS builder
 WORKDIR /app
 
 # Install dependencies
@@ -12,7 +12,7 @@ ENV VITE_API_URL=$VITE_API_URL
 RUN npm run build
 
 # Production server
-FROM node:18-alpine
+FROM node:20-alpine
 
 WORKDIR /app
 
