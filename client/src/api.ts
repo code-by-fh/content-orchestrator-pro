@@ -24,13 +24,33 @@ api.interceptors.response.use(
     }
 );
 
-export const login = async (username: string, password: string): Promise<{ token: string }> => {
+export const login = async (username: string, password: string): Promise<{ token: string; user: any }> => {
     const response = await api.post('/auth/login', { username, password });
     return response.data;
 };
 
 export const getMe = async (): Promise<any> => {
     const response = await api.get('/auth/me');
+    return response.data;
+};
+
+export const checkSetupStatus = async (): Promise<{ needsSetup: boolean }> => {
+    const response = await api.get('/auth/setup-status');
+    return response.data;
+};
+
+export const registerAdmin = async (username: string, password: string): Promise<{ token: string; user: any }> => {
+    const response = await api.post('/auth/register-admin', { username, password });
+    return response.data;
+};
+
+export const createUser = async (userData: { username: string; password: string; role?: string }): Promise<any> => {
+    const response = await api.post('/auth/create-user', userData);
+    return response.data;
+};
+
+export const changePassword = async (passwordData: { oldPassword: string; newPassword: string }): Promise<any> => {
+    const response = await api.post('/auth/change-password', passwordData);
     return response.data;
 };
 
