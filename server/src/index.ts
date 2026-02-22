@@ -16,6 +16,7 @@ initScheduler();
 import './worker';
 
 const app = express();
+app.set('trust proxy', 1); // Trust first proxy (required for Caprover/Nginx)
 const port = process.env.PORT || 3003;
 
 app.use(helmet({
