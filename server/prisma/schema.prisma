@@ -48,6 +48,7 @@ model Article {
   markdownContent  String?          @db.Text
   linkedinTeaser   String?          @db.Text
   xingSummary      String?          @db.Text
+  ogImageUrl       String?
   processingStatus ProcessingStatus @default(PROCESSING)
 
   seoTitle       String?

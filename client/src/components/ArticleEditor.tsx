@@ -71,6 +71,7 @@ export const ArticleEditor: React.FC = () => {
     const [seoDescription, setSeoDescription] = useState('');
     const [linkedinTeaser, setLinkedinTeaser] = useState('');
     const [xingSummary, setXingSummary] = useState('');
+    const [ogImageUrl, setOgImageUrl] = useState('');
     const [platformTokens, setPlatformTokens] = useState<Record<string, string>>({});
     const [showPublishModal, setShowPublishModal] = useState(false);
 
@@ -116,6 +117,7 @@ export const ArticleEditor: React.FC = () => {
             setSeoDescription(article.seoDescription || '');
             setLinkedinTeaser(article.linkedinTeaser || '');
             setXingSummary(article.xingSummary || '');
+            setOgImageUrl(article.ogImageUrl || '');
         }
     }, [article]);
 
@@ -196,7 +198,8 @@ export const ArticleEditor: React.FC = () => {
         seoTitle,
         seoDescription,
         linkedinTeaser,
-        xingSummary
+        xingSummary,
+        ogImageUrl
     });
 
     const handleSave = (isAutoSave = false) => {
@@ -852,6 +855,7 @@ export const ArticleEditor: React.FC = () => {
                                     seoDescription={seoDescription} setSeoDescription={setSeoDescription}
                                     linkedinTeaser={linkedinTeaser} setLinkedinTeaser={setLinkedinTeaser}
                                     xingSummary={xingSummary} setXingSummary={setXingSummary}
+                                    ogImageUrl={ogImageUrl} setOgImageUrl={setOgImageUrl}
                                     onClose={() => setShowInfoSidebar(false)}
                                     onShowTranscript={() => setShowTranscriptModal(true)}
                                 />
@@ -874,6 +878,7 @@ export const ArticleEditor: React.FC = () => {
                                     seoDescription={seoDescription} setSeoDescription={setSeoDescription}
                                     linkedinTeaser={linkedinTeaser} setLinkedinTeaser={setLinkedinTeaser}
                                     xingSummary={xingSummary} setXingSummary={setXingSummary}
+                                    ogImageUrl={ogImageUrl} setOgImageUrl={setOgImageUrl}
                                     onClose={() => setShowInfoSidebar(false)}
                                     onShowTranscript={() => setShowTranscriptModal(true)}
                                 />
@@ -970,9 +975,22 @@ const InfoPanelContent = ({
     seoDescription, setSeoDescription,
     linkedinTeaser, setLinkedinTeaser,
     xingSummary, setXingSummary,
+    ogImageUrl, setOgImageUrl,
     onClose, onShowTranscript
 }: any) => {
 
+
+    const [isDragging, setIsDragging] = useState(false);
+
+    const handleFileUpload = async (file: File) => {
+        try {
+            const { imageUrl } = await uploadImage(file);
+            setOgImageUrl(imageUrl);
+            toast.success('Image uploaded successfully');
+        } catch (error) {
+            toast.error('Failed to upload image');
+        }
+    };
 
     return (
         <>
@@ -1044,6 +1062,71 @@ const InfoPanelContent = ({
                                 className="w-full text-sm bg-background/50 border border-border/50 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500/50 text-foreground transition-all resize-none shadow-sm"
                                 placeholder="Xing summary content..."
                             />
+                        </div>
+                        <div className="space-y-1.5">
+                            <label className="text-sm font-medium text-muted-foreground ml-1">OG Image</label>
+                            <div className="flex flex-col gap-2">
+                                {ogImageUrl && (
+                                    <div className="relative group rounded-lg overflow-hidden border border-border/50 bg-background/50 w-full aspect-video flex items-center justify-center">
+                                        <img src={ogImageUrl.startsWith('http') || ogImageUrl.startsWith('/uploads') ? ogImageUrl : import.meta.env.VITE_API_URL?.replace('/api', '') + ogImageUrl} alt="OG Preview" className="max-w-full max-h-full object-contain" />
+                                        <button
+                                            onClick={() => setOgImageUrl('')}
+                                            className="absolute top-2 right-2 p-1.5 bg-background/80 hover:bg-red-500 hover:text-white rounded-md opacity-0 group-hover:opacity-100 transition-all text-muted-foreground shadow-sm backdrop-blur-sm"
+                                        >
+                                            <X size={14} />
+                                        </button>
+                                    </div>
+                                )}
+                                <div
+                                    className={cn(
+                                        "relative group flex items-center justify-center gap-2 bg-background border border-border/60 hover:bg-muted/50 text-foreground transition-all shadow-sm rounded-lg border-dashed border-2 p-4 min-h-[100px]",
+                                        isDragging && "border-emerald-500 bg-emerald-500/5 scale-[1.02]",
+                                        !ogImageUrl && "min-h-[140px]"
+                                    )}
+                                    onDragOver={(e) => {
+                                        e.preventDefault();
+                                        setIsDragging(true);
+                                    }}
+                                    onDragLeave={() => setIsDragging(false)}
+                                    onDrop={async (e) => {
+                                        e.preventDefault();
+                                        setIsDragging(false);
+                                        const file = e.dataTransfer.files?.[0];
+                                        if (file && file.type.startsWith('image/')) {
+                                            await handleFileUpload(file);
+                                        }
+                                    }}
+                                >
+                                    <label className="absolute inset-0 cursor-pointer flex flex-col items-center justify-center gap-2">
+                                        <UploadCloud
+                                            size={24}
+                                            className={cn(
+                                                "text-muted-foreground transition-colors",
+                                                isDragging && "text-emerald-500"
+                                            )}
+                                        />
+                                        <div className="flex flex-col items-center gap-0.5">
+                                            <span className="text-xs font-semibold">
+                                                {ogImageUrl ? 'Change Image' : 'Upload Image'}
+                                            </span>
+                                            <span className="text-[10px] text-muted-foreground">
+                                                Drag & drop or click to select
+                                            </span>
+                                        </div>
+                                        <input
+                                            type="file"
+                                            className="hidden"
+                                            accept="image/*"
+                                            onChange={async (e) => {
+                                                const file = e.target.files?.[0];
+                                                if (file) {
+                                                    await handleFileUpload(file);
+                                                }
+                                            }}
+                                        />
+                                    </label>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </section>

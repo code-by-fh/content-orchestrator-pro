@@ -41,7 +41,8 @@ export class WebhookAdapter implements PlatformAdapter {
                 content: article.markdownContent,
                 category: 'General',
                 excerpt: article.seoDescription || article.xingSummary || '',
-                locale: lang
+                locale: lang,
+                ...((article as any).ogImageUrl ? { image: (article as any).ogImageUrl } : {})
             };
 
             await axios.post(

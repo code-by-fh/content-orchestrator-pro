@@ -32,6 +32,7 @@ export interface Article {
     markdownContent?: string;
     linkedinTeaser?: string;
     xingSummary?: string;
+    ogImageUrl?: string;
     seoTitle?: string;
     seoDescription?: string;
 

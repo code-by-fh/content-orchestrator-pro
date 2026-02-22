@@ -225,6 +225,7 @@ export const updateArticle = async (req: Request, res: Response) => {
         if (req.body.seoDescription !== undefined) updateData.seoDescription = req.body.seoDescription;
         if (req.body.linkedinTeaser !== undefined) updateData.linkedinTeaser = req.body.linkedinTeaser;
         if (req.body.xingSummary !== undefined) updateData.xingSummary = req.body.xingSummary;
+        if (req.body.ogImageUrl !== undefined) updateData.ogImageUrl = req.body.ogImageUrl;
 
         // Handle scheduled publishing
         if (reqStatus === 'SCHEDULED' && scheduledAt) {

@@ -10,6 +10,86 @@ import { XingAdapter } from './adapters/xingAdapter';
 
 const prisma = new PrismaClient();
 
+async function uploadLocalImageToCMS(localUrl: string, altText: string, articleTitle: string): Promise<string | null> {
+    const cmsUrl = process.env.CONTENT_MANAGEMENT_IMAGE_URL;
+    const cmsToken = process.env.CONTENT_MANAGEMENT_TOKEN;
+
+    if (!cmsUrl || !cmsToken || !localUrl.includes('/uploads/')) {
+        return null;
+    }
+
+    try {
+        const fileName = localUrl.substring(localUrl.lastIndexOf('/') + 1);
+        // Correct path relative to where this script runs, assuming from src/services -> uploads is at root/uploads
+        // Wait, __dirname in src/services is dist/services in build. Let's use robust path.
+        const filePath = path.join(__dirname, '../../uploads', fileName);
+
+        if (!fs.existsSync(filePath)) {
+            console.error(`Local file not found for upload: ${filePath}`);
+            return null;
+        }
+
+        const baseUrl = new URL(cmsUrl).origin;
+        const ext = path.extname(fileName).toLowerCase();
+
+        let mimeType = 'application/octet-stream';
+        if (ext === '.jpg' || ext === '.jpeg') mimeType = 'image/jpeg';
+        else if (ext === '.png') mimeType = 'image/png';
+        else if (ext === '.gif') mimeType = 'image/gif';
+        else if (ext === '.webp') mimeType = 'image/webp';
+        else if (ext === '.svg') mimeType = 'image/svg+xml';
+
+        let baseName = (altText && altText.length > 2 && altText.toLowerCase() !== 'image') ? altText : articleTitle;
+        const seoName = baseName.toLowerCase()
+            .replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss')
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/(^-|-$)/g, '');
+
+        const seoFileName = `${seoName}${ext}`;
+
+        const fileBuffer = await fs.promises.readFile(filePath);
+        const blob = new Blob([fileBuffer], { type: mimeType });
+
+        const formData = new FormData();
+        formData.append('title', altText || articleTitle);
+        formData.append('filename_download', seoFileName);
+        formData.append('file', blob, seoFileName);
+
+        const response = await fetch(cmsUrl, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${cmsToken}`
+            },
+            body: formData
+        });
+
+        if (!response.ok) {
+            throw new Error(`Request failed with status code ${response.status}`);
+        }
+
+        const result = await response.json();
+        const imageId = result?.data?.id;
+
+        if (imageId) {
+            const newImageUrl = `${baseUrl}/assets/${imageId}/${seoFileName}`;
+
+            try {
+                if (fs.existsSync(filePath)) {
+                    fs.promises.unlink(filePath).catch(e => console.error('Failed to unlink local image:', e));
+                }
+            } catch (e) {
+                console.error('Failed to delete local file', e);
+            }
+
+            return newImageUrl;
+        }
+    } catch (error: any) {
+        console.error(`Failed to upload local image ${localUrl} to CMS:`, error.message);
+    }
+
+    return null;
+}
+
 async function processImages(articleId: string, markdownContent: string | null, language: string, articleTitle: string): Promise<string | null> {
     console.log('Processing images for article', articleId);
     const cmsUrl = process.env.CONTENT_MANAGEMENT_IMAGE_URL;
@@ -31,72 +111,10 @@ async function processImages(articleId: string, markdownContent: string | null, 
         const url = match[2];
 
         if (url.includes('/uploads/')) {
-            try {
-                const fileName = url.substring(url.lastIndexOf('/') + 1);
-                const filePath = path.join(__dirname, '../../uploads', fileName);
-
-                if (!fs.existsSync(filePath)) {
-                    console.error(`Local file not found for upload: ${filePath}`);
-                    continue;
-                }
-
-                const baseUrl = new URL(cmsUrl).origin;
-                const ext = path.extname(fileName).toLowerCase();
-
-                let mimeType = 'application/octet-stream';
-                if (ext === '.jpg' || ext === '.jpeg') mimeType = 'image/jpeg';
-                else if (ext === '.png') mimeType = 'image/png';
-                else if (ext === '.gif') mimeType = 'image/gif';
-                else if (ext === '.webp') mimeType = 'image/webp';
-                else if (ext === '.svg') mimeType = 'image/svg+xml';
-
-                let baseName = (altText && altText.length > 2 && altText.toLowerCase() !== 'image') ? altText : articleTitle;
-                const seoName = baseName.toLowerCase()
-                    .replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss')
-                    .replace(/[^a-z0-9]+/g, '-')
-                    .replace(/(^-|-$)/g, '');
-
-                const seoFileName = `${seoName}${ext}`;
-
-                // Read local file into a Blob for native fetch multipart upload
-                const fileBuffer = await fs.promises.readFile(filePath);
-                const blob = new Blob([fileBuffer], { type: mimeType });
-
-                const formData = new FormData();
-                formData.append('title', altText || articleTitle);
-                formData.append('filename_download', seoFileName);
-                formData.append('file', blob, seoFileName);
-
-                const response = await fetch(cmsUrl, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${cmsToken}`
-                    },
-                    body: formData
-                });
-
-                if (!response.ok) {
-                    throw new Error(`Request failed with status code ${response.status}`);
-                }
-
-                const result = await response.json();
-                const imageId = result?.data?.id;
-
-                if (imageId) {
-                    const newImageUrl = `${baseUrl}/assets/${imageId}/${seoFileName}`;
-                    newMarkdownContent = newMarkdownContent.replace(fullMatch, `![${altText}](${newImageUrl})`);
-                    hasChanges = true;
-
-                    try {
-                        if (fs.existsSync(filePath)) {
-                            fs.promises.unlink(filePath).catch(e => console.error('Failed to unlink local image:', e));
-                        }
-                    } catch (e) {
-                        console.error('Failed to delete local file', e);
-                    }
-                }
-            } catch (error: any) {
-                console.error(`Failed to upload local image ${url} to CMS:`, error.message);
+            const newImageUrl = await uploadLocalImageToCMS(url, altText, articleTitle);
+            if (newImageUrl) {
+                newMarkdownContent = newMarkdownContent.replace(fullMatch, `![${altText}](${newImageUrl})`);
+                hasChanges = true;
             }
         }
     }
@@ -157,7 +175,7 @@ class PublishingService {
         });
 
         // Use correct article content based on language selection
-        const publishedArticle = {
+        let publishedArticle: any = {
             ...article,
             title: language === 'EN' ? (article.titleEn || article.title) : article.title,
             seoTitle: language === 'EN' ? (article.seoTitleEn || article.seoTitle) : article.seoTitle,
@@ -166,6 +184,25 @@ class PublishingService {
             linkedinTeaser: language === 'EN' ? (article.linkedinTeaserEn || article.linkedinTeaser) : article.linkedinTeaser,
             xingSummary: language === 'EN' ? (article.xingSummaryEn || article.xingSummary) : article.xingSummary,
         };
+
+        // Handle ogImageUrl if it's a local upload
+        if (publishedArticle.ogImageUrl && publishedArticle.ogImageUrl.includes('/uploads/')) {
+            console.log('Uploading ogImageUrl to CMS...');
+            const newOgImageUrl = await uploadLocalImageToCMS(
+                publishedArticle.ogImageUrl,
+                `${publishedArticle.title} OG Image`,
+                publishedArticle.title
+            );
+
+            if (newOgImageUrl) {
+                publishedArticle.ogImageUrl = newOgImageUrl;
+                // Update the database so we don't upload it again next time
+                await prisma.article.update({
+                    where: { id: articleId },
+                    data: { ogImageUrl: newOgImageUrl }
+                });
+            }
+        }
 
         const newMarkdown = await processImages(articleId, publishedArticle.markdownContent, language, publishedArticle.title);
         publishedArticle.markdownContent = newMarkdown;
