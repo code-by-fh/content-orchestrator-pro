@@ -3,7 +3,8 @@ FROM node:20-alpine
 WORKDIR /app
 
 # Install dependencies
-RUN apk add --no-cache openssl
+RUN apk add --no-cache openssl python3 py3-pip
+RUN pip install --break-system-packages youtube-transcript-api
 COPY package*.json ./
 RUN npm install
 

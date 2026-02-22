@@ -135,7 +135,7 @@ const worker = new Worker('content-queue', async (job: Job) => {
             rawText = await new Promise<string>((resolve, reject) => {
                 const scriptPath = path.join(__dirname, '../scripts/extract_transcript.py');
                 const execStart = performance.now();
-                exec(`python "${scriptPath}" "${videoId}"`, (error, stdout, stderr) => {
+                exec(`python3 "${scriptPath}" "${videoId}"`, (error, stdout, stderr) => {
                     if (error) {
                         console.error(`[Extraction Error] Python script failed after ${(performance.now() - execStart).toFixed(2)}ms: ${stderr}`);
                         return reject(new Error(stderr));
