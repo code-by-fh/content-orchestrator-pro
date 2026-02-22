@@ -1,21 +1,37 @@
 version: '3.8'
 
 services:
-  # app:
-  #   build: .
-  #   container_name: content-orchestrator-app
-  #   restart: always
-  #   ports:
-  #     - "3000:3000"
-  #   environment:
-  #     DATABASE_URL: "postgresql://postgres:postgrespassword@db:5432/content_orchestrator?schema=public"
-  #     JWT_SECRET: "changeme_in_prod"
-  #     GEMINI_API_KEY: "${GEMINI_API_KEY}" # Pass via .env or shell
-  #     REDIS_HOST: "redis"
-  #     REDIS_PORT: 6379
-  #   depends_on:
-  #     - db
-  #     - redis
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    container_name: content-orchestrator-client
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      VITE_API_URL: "${VITE_API_URL:-http://localhost:3003/api}"
+    depends_on:
+      - server
+
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: content-orchestrator-server
+    restart: always
+    ports:
+      - "3003:3003"
+    environment:
+      DATABASE_URL: "postgresql://postgres:postgrespassword@db:5432/content_orchestrator?schema=public"
+      JWT_SECRET: "changeme_in_prod"
+      GEMINI_API_KEY: "${GEMINI_API_KEY}" # Pass via .env or shell
+      REDIS_HOST: "redis"
+      REDIS_PORT: 6379
+      PORT: 3003
+    depends_on:
+      - db
+      - redis
 
   db:
     image: postgres:15-alpine

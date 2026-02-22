@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Command } from 'cmdk';
 import { useNavigate } from 'react-router-dom';
 import { Search, FileText, Settings as SettingsIcon, Plus, Home, Moon, Sun, Laptop } from 'lucide-react';
