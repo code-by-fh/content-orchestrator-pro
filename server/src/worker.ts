@@ -217,5 +217,6 @@ const worker = new Worker('content-queue', async (job: Job) => {
     connection: {
         host: process.env.REDIS_HOST || 'localhost',
         port: Number(process.env.REDIS_PORT) || 6379,
+        password: process.env.REDIS_PASSWORD,
     },
 });
