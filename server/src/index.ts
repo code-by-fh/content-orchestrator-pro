@@ -34,26 +34,13 @@ app.use('/api/auth', authRoutes);
 app.use('/api/content', contentRoutes);
 app.use('/api', distributionRoutes);
 
-// Serve static files from client/dist
-const clientDist = path.join(__dirname, '../../client/dist');
+// Handle uploads
 const uploadsPath = path.join(__dirname, '../uploads');
-
-// Ensure uploads directory exists
 import fs from 'fs';
 if (!fs.existsSync(uploadsPath)) {
   fs.mkdirSync(uploadsPath, { recursive: true });
 }
-
 app.use('/uploads', express.static(uploadsPath));
-app.use(express.static(clientDist));
-
-// Handle SPA routing
-app.get('*', (req, res) => {
-  if (req.path.startsWith('/api')) {
-    return res.status(404).json({ message: 'API endpoint not found' });
-  }
-  res.sendFile(path.join(clientDist, 'index.html'));
-});
 
 app.listen(port, () => {
   console.log(`Server is running at http://localhost:${port}`);
