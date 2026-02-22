@@ -3,7 +3,7 @@ import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-q
 import { useInView } from 'react-intersection-observer';
 import { getArticles, createArticle, deleteArticle, updateArticle, unpublishAllFromArticle, reprocessArticle } from '../api';
 import { Link } from 'react-router-dom';
-import { Plus, Youtube, FileText, Loader2, Clock, CheckCircle, Trash2, Calendar, Search, Filter, AlertCircle, Play } from 'lucide-react';
+import { Plus, Youtube, FileText, Loader2, Clock, CheckCircle, Trash2, Calendar, Search, Filter, AlertCircle, Play, Undo2, Linkedin, Share2, Globe, Rss } from 'lucide-react';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
 import { cn } from '../lib/utils';
@@ -11,6 +11,7 @@ import { cn } from '../lib/utils';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ConfirmationModal } from './ui/ConfirmationModal';
+import { Tooltip } from './ui/Tooltip';
 
 
 export const ArticleList: React.FC = () => {
@@ -18,6 +19,7 @@ export const ArticleList: React.FC = () => {
     const [url, setUrl] = useState('');
     const [confirmDeleteItem, setConfirmDeleteItem] = useState<{ id: string, isPublished: boolean, isScheduled: boolean } | null>(null);
     const [confirmUnpublishItem, setConfirmUnpublishItem] = useState<{ id: string } | null>(null);
+    const [confirmReprocessItem, setConfirmReprocessItem] = useState<{ id: string } | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [showOnlyPublished, setShowOnlyPublished] = useState(false);
 
@@ -238,6 +240,27 @@ export const ArticleList: React.FC = () => {
                                                             Scheduled: {new Date(article.scheduledAt).toLocaleString()}
                                                         </p>
                                                     )}
+                                                    <div className="flex items-center gap-1.5 mt-2">
+                                                        {article.publications?.filter(p => p.status === 'PUBLISHED').map((pub: any) => {
+                                                            const getPlatformIcon = (platform: string) => {
+                                                                switch (platform) {
+                                                                    case 'LINKEDIN': return { icon: <Linkedin size={10} />, color: 'text-[#0077b5]', bg: 'bg-[#0077b5]/10' };
+                                                                    case 'XING': return { icon: <Share2 size={10} />, color: 'text-[#026466]', bg: 'bg-[#026466]/10' };
+                                                                    case 'RSS': return { icon: <Rss size={10} />, color: 'text-orange-500', bg: 'bg-orange-500/10' };
+                                                                    case 'WEBHOOK': return { icon: <Globe size={10} />, color: 'text-blue-500', bg: 'bg-blue-500/10' };
+                                                                    default: return { icon: <Globe size={10} />, color: 'text-muted-foreground', bg: 'bg-muted/30' };
+                                                                }
+                                                            };
+                                                            const info = getPlatformIcon(pub.platform);
+                                                            return (
+                                                                <Tooltip key={pub.id} content={`Published on ${pub.platform} (${pub.language})`} side="top">
+                                                                    <div className={cn("flex items-center justify-center h-5 w-5 rounded-full border border-white/5", info.bg, info.color)}>
+                                                                        {info.icon}
+                                                                    </div>
+                                                                </Tooltip>
+                                                            );
+                                                        })}
+                                                    </div>
                                                 </div>
                                             </div>
 
@@ -263,7 +286,7 @@ export const ArticleList: React.FC = () => {
                                                         article={article}
                                                         onDelete={() => setConfirmDeleteItem({ id: article.id, isPublished: !!article.publications?.some(pub => pub.status === 'PUBLISHED'), isScheduled: !!article.scheduledAt })}
                                                         onUnpublish={(id) => setConfirmUnpublishItem({ id })}
-                                                        onReprocess={() => reprocessMutation.mutate(article.id)}
+                                                        onReprocess={() => setConfirmReprocessItem({ id: article.id })}
                                                         isUnpublishing={unpublishMutation.isPending && unpublishMutation.variables === article.id}
                                                         isReprocessing={reprocessMutation.isPending && reprocessMutation.variables === article.id}
                                                     />
@@ -342,6 +365,22 @@ export const ArticleList: React.FC = () => {
                 variant="warning"
                 isLoading={updateMutation.isPending}
             />
+
+            <ConfirmationModal
+                isOpen={!!confirmReprocessItem}
+                onClose={() => setConfirmReprocessItem(null)}
+                onConfirm={() => {
+                    if (confirmReprocessItem) {
+                        reprocessMutation.mutate(confirmReprocessItem.id);
+                        setConfirmReprocessItem(null);
+                    }
+                }}
+                title="Reprocess Article"
+                description="Do you want to re-generate this article? This will overwrite the current content with a fresh AI-generated version based on the original source."
+                confirmLabel="Reprocess"
+                variant="info"
+                isLoading={reprocessMutation.isPending}
+            />
         </div>
     );
 };
@@ -369,14 +408,14 @@ const ArticleActions = ({
                     variant="ghost"
                     size="icon"
                     className="h-8 w-8 text-muted-foreground hover:text-amber-500 hover:bg-amber-500/10 z-10 relative"
-                    title="Unpublish"
+                    title="Unpublish (Revert to Draft)"
                     onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
                         onUnpublish(article.id);
                     }}
                 >
-                    {isUnpublishing ? <Loader2 size={16} className="animate-spin" /> : <Loader2 size={16} className="rotate-180" />}
+                    {isUnpublishing ? <Loader2 size={16} className="animate-spin" /> : <Undo2 size={16} />}
                 </Button>
             )}
             {(article.processingStatus === 'FAILED' || article.processingStatus === 'COMPLETED') && (
@@ -384,13 +423,13 @@ const ArticleActions = ({
                     variant="ghost"
                     size="icon"
                     className="h-8 w-8 text-muted-foreground hover:text-indigo-500 hover:bg-indigo-500/10 z-10 relative"
-                    title="Start/Retry Processing"
+                    title="Reprocess Article"
                     onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
                         onReprocess();
                     }}
-                    disabled={isReprocessing}
+                    disabled={isReprocessing || article.processingStatus === 'PROCESSING'}
                 >
                     {isReprocessing ? <Loader2 size={16} className="animate-spin" /> : <Play size={16} />}
                 </Button>
@@ -399,6 +438,7 @@ const ArticleActions = ({
                 variant="ghost"
                 size="icon"
                 className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 z-10 relative"
+                title="Delete"
                 onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
