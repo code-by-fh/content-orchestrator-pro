@@ -39,7 +39,7 @@ export class WebhookAdapter implements PlatformAdapter {
                 slug: article.slug,
                 date: dateString,
                 content: article.markdownContent,
-                category: 'General',
+                category: (article as any).category || 'General',
                 excerpt: article.seoDescription || article.xingSummary || '',
                 locale: lang,
                 ...((article as any).ogImageUrl ? { image: (article as any).ogImageUrl } : {})

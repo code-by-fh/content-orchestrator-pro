@@ -35,6 +35,7 @@ export interface Article {
     ogImageUrl?: string;
     seoTitle?: string;
     seoDescription?: string;
+    category?: string;
 
     titleEn?: string;
     markdownContentEn?: string;

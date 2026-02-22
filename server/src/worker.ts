@@ -20,6 +20,7 @@ const aiResponseSchema = z.object({
     seoTitle: z.string(),
     seoDescription: z.string(),
     slug: z.string(),
+    category: z.string(),
 });
 
 type ValidatedArticle = z.infer<typeof aiResponseSchema>;
@@ -34,8 +35,9 @@ const responseSchema = {
         seoTitle: { type: Type.STRING },
         seoDescription: { type: Type.STRING },
         slug: { type: Type.STRING },
+        category: { type: Type.STRING },
     },
-    required: ['markdownContent', 'linkedinTeaser', 'xingSummary', 'seoTitle', 'seoDescription', 'slug'],
+    required: ['markdownContent', 'linkedinTeaser', 'xingSummary', 'seoTitle', 'seoDescription', 'slug', 'category'],
 };
 
 // 3. Robuste KI-Funktion
@@ -60,12 +62,12 @@ async function generateArticleContent(rawText: string): Promise<ValidatedArticle
             - Länge: mindestens so viele Wörter wie im Transkript vorhanden sind
             
             Zusätzliche Outputs (halte dich dabei IMMER an die beschriebene Tonalität und Zielgruppe und gebe diese IMMER in der JSON zurück):
-            - LinkedIn Teaser: Kurzer, knackiger Text (ca. 2-3 Sätze) für LinkedIn
-            - Xing Summary: Etwas längere Zusammenfassung für Xing
-            - SEO Title: Optimierter Titel für Suchmaschinen
-            - SEO Description: Ein ansprechender Meta-Description-Text (max. 160 Zeichen)
-            - Slug: URL-freundlicher Slug
-            - Kategorie: Kategorie für den Artikel
+            - LinkedIn Teaser: Kurzer, knackiger Text (ca. 2-3 Sätze) für LinkedIn.
+            - Xing Summary: Kurze Zusammenfassung für Xing (maximal 319 Zeichen!).
+            - SEO Title: Optimierter Titel für Suchmaschinen.
+            - SEO Description: Ein ansprechender Meta-Description-Text (max. 160 Zeichen).
+            - Slug: URL-freundlicher Slug.
+            - Kategorie: Kategorie für den Artikel.
             
             Wichtige Hinweise:
             - Achte auf korrekte Fachbegriffe
@@ -88,7 +90,8 @@ async function generateArticleContent(rawText: string): Promise<ValidatedArticle
                 "xingSummary": "...",
                 "seoTitle": "...",
                 "seoDescription": "...",
-                "slug": "..."
+                "slug": "...",
+                "category": "..."
             }`
         }
     });
@@ -170,6 +173,7 @@ const worker = new Worker('content-queue', async (job: Job) => {
                 seoTitle: validatedData.seoTitle,
                 seoDescription: validatedData.seoDescription,
                 slug: validatedData.slug,
+                category: validatedData.category,
                 rawTranscript: rawText,
                 processingStatus: 'COMPLETED'
             },

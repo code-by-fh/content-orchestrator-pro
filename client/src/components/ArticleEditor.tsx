@@ -72,6 +72,7 @@ export const ArticleEditor: React.FC = () => {
     const [linkedinTeaser, setLinkedinTeaser] = useState('');
     const [xingSummary, setXingSummary] = useState('');
     const [ogImageUrl, setOgImageUrl] = useState('');
+    const [category, setCategory] = useState('');
     const [platformTokens, setPlatformTokens] = useState<Record<string, string>>({});
     const [showPublishModal, setShowPublishModal] = useState(false);
 
@@ -118,6 +119,7 @@ export const ArticleEditor: React.FC = () => {
             setLinkedinTeaser(article.linkedinTeaser || '');
             setXingSummary(article.xingSummary || '');
             setOgImageUrl(article.ogImageUrl || '');
+            setCategory(article.category || '');
         }
     }, [article]);
 
@@ -199,7 +201,8 @@ export const ArticleEditor: React.FC = () => {
         seoDescription,
         linkedinTeaser,
         xingSummary,
-        ogImageUrl
+        ogImageUrl,
+        category
     });
 
     const handleSave = (isAutoSave = false) => {
@@ -856,6 +859,7 @@ export const ArticleEditor: React.FC = () => {
                                     linkedinTeaser={linkedinTeaser} setLinkedinTeaser={setLinkedinTeaser}
                                     xingSummary={xingSummary} setXingSummary={setXingSummary}
                                     ogImageUrl={ogImageUrl} setOgImageUrl={setOgImageUrl}
+                                    category={category} setCategory={setCategory}
                                     onClose={() => setShowInfoSidebar(false)}
                                     onShowTranscript={() => setShowTranscriptModal(true)}
                                 />
@@ -879,6 +883,7 @@ export const ArticleEditor: React.FC = () => {
                                     linkedinTeaser={linkedinTeaser} setLinkedinTeaser={setLinkedinTeaser}
                                     xingSummary={xingSummary} setXingSummary={setXingSummary}
                                     ogImageUrl={ogImageUrl} setOgImageUrl={setOgImageUrl}
+                                    category={category} setCategory={setCategory}
                                     onClose={() => setShowInfoSidebar(false)}
                                     onShowTranscript={() => setShowTranscriptModal(true)}
                                 />
@@ -976,6 +981,7 @@ const InfoPanelContent = ({
     linkedinTeaser, setLinkedinTeaser,
     xingSummary, setXingSummary,
     ogImageUrl, setOgImageUrl,
+    category, setCategory,
     onClose, onShowTranscript
 }: any) => {
 
@@ -1033,6 +1039,16 @@ const InfoPanelContent = ({
                                 placeholder="Enter meta description..."
                             />
                         </div>
+                        <div className="space-y-1.5">
+                            <label className="text-sm font-medium text-muted-foreground ml-1">Category</label>
+                            <input
+                                type="text"
+                                value={category}
+                                onChange={(e) => setCategory(e.target.value)}
+                                className="w-full text-sm bg-background/50 border border-border/50 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500/50 text-foreground transition-all shadow-sm"
+                                placeholder="Article category..."
+                            />
+                        </div>
                     </div>
                 </section>
 
@@ -1054,13 +1070,27 @@ const InfoPanelContent = ({
                             />
                         </div>
                         <div className="space-y-1.5">
-                            <label className="text-sm font-medium text-muted-foreground ml-1">Xing Summary</label>
+                            <div className="flex justify-between items-center ml-1">
+                                <label className="text-sm font-medium text-muted-foreground">Xing Summary</label>
+                                <span className={cn(
+                                    "text-[10px] font-mono",
+                                    xingSummary.length > 319 ? "text-red-500 font-bold" : "text-muted-foreground"
+                                )}>
+                                    {xingSummary.length}/319
+                                </span>
+                            </div>
                             <textarea
                                 value={xingSummary}
                                 onChange={(e) => setXingSummary(e.target.value)}
                                 rows={5}
-                                className="w-full text-sm bg-background/50 border border-border/50 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500/50 text-foreground transition-all resize-none shadow-sm"
-                                placeholder="Xing summary content..."
+                                maxLength={319}
+                                className={cn(
+                                    "w-full text-sm bg-background/50 border rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 transition-all resize-none shadow-sm",
+                                    xingSummary.length >= 319
+                                        ? "border-amber-500/50 focus:ring-amber-500/20 focus:border-amber-500"
+                                        : "border-border/50 focus:ring-emerald-500/20 focus:border-emerald-500/50"
+                                )}
+                                placeholder="Xing summary content (max 319 characters)..."
                             />
                         </div>
                         <div className="space-y-1.5">
