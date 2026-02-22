@@ -33,6 +33,7 @@ import {
     Linkedin,
     Share2,
     Globe,
+    Rss,
     HelpCircle,
     AlignCenter,
     AlignLeft,
@@ -47,8 +48,7 @@ import type { Article } from '../types';
 import { Panel, Group, Separator } from 'react-resizable-panels';
 import { ConfirmationModal } from './ui/ConfirmationModal';
 import { Tooltip } from './ui/Tooltip';
-
-
+import { Badge } from './ui/Badge';
 
 export const ArticleEditor: React.FC = () => {
     const { id } = useParams<{ id: string }>();
@@ -484,54 +484,119 @@ export const ArticleEditor: React.FC = () => {
 
                     <div className="min-w-0 flex-1">
                         <h1 className="text-sm font-semibold text-foreground truncate max-w-[120px] md:max-w-md">{article.title}</h1>
-                        <div className="flex items-center gap-2">
-                            <div className="text-[10px] uppercase font-bold text-muted-foreground tracking-tight">
-                                {article.publications?.some((p: any) => p.status === 'PUBLISHED') ? 'PUBLISHED' : article.scheduledAt ? 'SCHEDULED' : 'DRAFT'}
-                            </div>
+                        <div className="flex items-center gap-3">
+                            <AnimatePresence mode="wait">
+                                {article.publications?.some((p: any) => p.status === 'PUBLISHED') ? (
+                                    <motion.div
+                                        key="published"
+                                        initial={{ opacity: 0, scale: 0.9 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        className="flex items-center"
+                                    >
+                                        <Badge variant="success" className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20 px-2 py-0.5 gap-1.5 flex items-center shadow-[0_0_10px_rgba(16,185,129,0.1)]">
+                                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_5px_rgba(16,185,129,0.5)] animate-pulse" />
+                                            PUBLISHED
+                                        </Badge>
+                                    </motion.div>
+                                ) : article.scheduledAt ? (
+                                    <motion.div
+                                        key="scheduled"
+                                        initial={{ opacity: 0, scale: 0.9 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        className="flex items-center"
+                                    >
+                                        <Badge variant="processing" className="bg-amber-500/10 text-amber-500 border-amber-500/20 px-2 py-0.5 gap-1.5 flex items-center shadow-[0_0_10px_rgba(245,158,11,0.1)]">
+                                            <Calendar size={10} className="animate-pulse" />
+                                            SCHEDULED
+                                        </Badge>
+                                    </motion.div>
+                                ) : (
+                                    <motion.div
+                                        key="draft"
+                                        initial={{ opacity: 0, scale: 0.9 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        className="flex items-center"
+                                    >
+                                        <Badge variant="secondary" className="bg-muted text-muted-foreground border-border px-2 py-0.5 gap-1.5 flex items-center">
+                                            <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground/50" />
+                                            DRAFT
+                                        </Badge>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
 
                             {/* Platform Icons for Published Content */}
                             {article.publications && article.publications.some(p => p.status === 'PUBLISHED') && (
                                 <>
-                                    <div className="w-px h-3 bg-border/40 shrink-0" />
-                                    <div className="flex items-center gap-1">
+                                    <div className="w-px h-4 bg-border/40 shrink-0" />
+                                    <div className="flex items-center -space-x-1.5">
                                         {article.publications
                                             .filter(p => p.status === 'PUBLISHED')
-                                            .map((pub) => {
+                                            .map((pub, idx) => {
                                                 const platform = pub.platform.toUpperCase();
-                                                return (
-                                                    <Tooltip key={pub.id} content={`Published on ${platform}`} side="bottom">
-                                                        <div
-                                                            className={cn(
-                                                                "p-1 rounded bg-muted/30 text-muted-foreground hover:text-foreground transition-colors shrink-0",
-                                                                platform === 'LINKEDIN' && "hover:text-[#0077b5]",
-                                                                platform === 'XING' && "hover:text-[#026466]",
-                                                                platform === 'RSS' && "hover:text-orange-500",
-                                                                platform === 'WEBHOOK' && "hover:text-blue-500"
-                                                            )}
-                                                        >
-                                                            {platform === 'LINKEDIN' ? <Linkedin size={10} /> :
-                                                                platform === 'XING' ? <Share2 size={10} /> :
-                                                                    platform === 'RSS' ? <Globe size={10} /> :
-                                                                        platform === 'WEBHOOK' ? <Globe size={10} /> :
-                                                                            <UploadCloud size={10} />}
-                                                        </div>
-                                                    </Tooltip>
+                                                const getPlatformInfo = (p: string) => {
+                                                    switch (p) {
+                                                        case 'LINKEDIN': return { icon: <Linkedin size={12} />, color: 'text-[#0077b5]', bg: 'bg-[#0077b5]/10', border: 'border-[#0077b5]/20' };
+                                                        case 'XING': return { icon: <Share2 size={12} />, color: 'text-[#026466]', bg: 'bg-[#026466]/10', border: 'border-[#026466]/20' };
+                                                        case 'RSS': return { icon: <Rss size={12} />, color: 'text-orange-500', bg: 'bg-orange-500/10', border: 'border-orange-500/20' };
+                                                        case 'WEBHOOK': return { icon: <Globe size={12} />, color: 'text-blue-500', bg: 'bg-blue-500/10', border: 'border-blue-500/20' };
+                                                        default: return { icon: <UploadCloud size={12} />, color: 'text-muted-foreground', bg: 'bg-muted/30', border: 'border-border/40' };
+                                                    }
+                                                };
+                                                const info = getPlatformInfo(platform);
 
+                                                return (
+                                                    <Tooltip key={pub.id} content={platform === 'RSS' ? 'Open Global RSS Feed' : `View ${platform} post (${pub.language})${pub.publishedAt ? ' - Published ' + new Date(pub.publishedAt).toLocaleDateString() : ''}`} side="bottom">
+                                                        <motion.div
+                                                            initial={{ opacity: 0, x: -10 }}
+                                                            animate={{ opacity: 1, x: 0 }}
+                                                            transition={{ delay: idx * 0.1 }}
+                                                            whileHover={{ scale: 1.15, zIndex: 10, y: -2 }}
+                                                            whileTap={{ scale: 0.95 }}
+                                                            className={cn(
+                                                                "h-8 w-8 rounded-full flex items-center justify-center border shadow-sm transition-all duration-300 cursor-pointer backdrop-blur-md",
+                                                                info.bg,
+                                                                info.color,
+                                                                info.border,
+                                                                "hover:shadow-md hover:border-current"
+                                                            )}
+                                                            onClick={async () => {
+                                                                const loadingToast = toast.loading(`Opening ${platform === 'RSS' ? 'Feed' : platform}...`);
+                                                                try {
+                                                                    const { shareUrl } = await getShareUrl(article.id, platform, pub.language);
+                                                                    toast.dismiss(loadingToast);
+                                                                    if (shareUrl) {
+                                                                        window.open(shareUrl, '_blank');
+                                                                    } else {
+                                                                        toast.error(`No share URL available for ${platform}.`);
+                                                                    }
+                                                                } catch (err) {
+                                                                    toast.dismiss(loadingToast);
+                                                                    toast.error(`Failed to retrieve ${platform} URL.`);
+                                                                }
+                                                            }}
+                                                        >
+                                                            {info.icon}
+                                                        </motion.div>
+                                                    </Tooltip>
                                                 );
                                             })}
                                     </div>
                                 </>
                             )}
+
                             {article.scheduledAt && !article.publications?.some((p: any) => p.status === 'PUBLISHED') && (
                                 <>
-                                    <div className="w-px h-3 bg-border/40 shrink-0" />
-                                    <button
-                                        onClick={() => setShowPublishModal(true)}
-                                        className="text-[10px] text-blue-400 hover:text-blue-300 flex items-center gap-1 hover:underline cursor-pointer font-medium shrink-0"
-                                    >
-                                        <Calendar size={10} />
-                                        <span>{new Date(article.scheduledAt).toLocaleString()}</span>
-                                    </button>
+                                    <div className="w-px h-4 bg-border/40 shrink-0" />
+                                    <Tooltip content="Scheduled Publication" side="bottom">
+                                        <button
+                                            onClick={() => setShowPublishModal(true)}
+                                            className="text-[11px] text-blue-400 hover:text-blue-300 flex items-center gap-1.5 hover:underline transition-all duration-200 font-medium shrink-0 bg-blue-400/5 px-2 py-0.5 rounded-full border border-blue-400/20"
+                                        >
+                                            <Calendar size={12} />
+                                            <span>{new Date(article.scheduledAt).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}</span>
+                                        </button>
+                                    </Tooltip>
                                 </>
                             )}
                         </div>

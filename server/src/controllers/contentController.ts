@@ -306,6 +306,11 @@ export const getShareUrl = async (req: Request, res: Response) => {
         let shareUrl = '';
         if (platform === 'XING') {
             shareUrl = `https://www.xing.com/spi/shares/new?url=${encodeURIComponent(publicArticleUrl)}`;
+        } else if (platform === 'LINKEDIN') {
+            shareUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(publicArticleUrl)}`;
+        } else if (platform === 'RSS') {
+            const backendUrl = process.env.BACKEND_URL || `${req.protocol}://${req.get('host')}`;
+            shareUrl = `${backendUrl.endsWith('/') ? backendUrl.slice(0, -1) : backendUrl}/api/rss`;
         } else {
             // Default to just the article URL if no platform or unsupported
             shareUrl = publicArticleUrl;
