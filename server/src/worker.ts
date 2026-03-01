@@ -12,7 +12,6 @@ dotenv.config();
 const prisma = new PrismaClient();
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
-// 3. Robuste KI-Funktion
 async function generateArticleContent(rawText: string): Promise<ValidatedArticle> {
     const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
@@ -27,12 +26,10 @@ async function generateArticleContent(rawText: string): Promise<ValidatedArticle
     const text = response.text;
     if (!text) throw new Error("AI hat keinen Text zurückgegeben");
 
-    // Sicherer Parse-Vorgang
     const jsonData = JSON.parse(text);
     return aiResponseSchema.parse(jsonData);
 }
 
-// 4. Worker Implementierung
 const worker = new Worker('content-queue', async (job: Job) => {
     const { articleId, type, sourceUrl } = job.data;
     const jobStartTime = performance.now();
@@ -60,7 +57,7 @@ const worker = new Worker('content-queue', async (job: Job) => {
         let extractionTime = 0;
         let generationTime = 0;
 
-        // --- Step 1 & 2: Content Acquisition ---
+        // Content Acquisition
         if (type === 'YOUTUBE') {
             const videoId = sourceUrl.match(/(?:v=|\/)([\w-]{11})(?:\?|&|\/|$)/)?.[1];
             if (!videoId) throw new Error('Ungültige YouTube URL');
@@ -72,7 +69,6 @@ const worker = new Worker('content-queue', async (job: Job) => {
             generationTime = 0; // Integrated in extraction/processing for YT
             logger.info(`✅ [Step 1&2] Completed in ${extractionTime.toFixed(2)}ms.`);
         } else if (type === 'MEDIUM') {
-            // else if (type === 'MEDIUM') handled in previous block partly, just target the inner block 
             logger.info(`\n⏳ [Step 1: Extraction] Starting Medium text extraction...`);
             const extractionStart = performance.now();
             const rawText = await extractMediumContent(sourceUrl);
@@ -88,7 +84,7 @@ const worker = new Worker('content-queue', async (job: Job) => {
             throw new Error(`Unsupported type: ${type}`);
         }
 
-        // --- Step 3: Database Update ---
+        // Database Update
         logger.info(`\n💾 [Step 3: DB Update] Saving results to database...`);
         const finalDbStart = performance.now();
 
@@ -111,7 +107,7 @@ const worker = new Worker('content-queue', async (job: Job) => {
         const finalDbTime = performance.now() - finalDbStart;
         logger.info(`✅ [Step 3: DB Update] Completed in ${finalDbTime.toFixed(2)}ms.`);
 
-        // --- Summary ---
+        // Summary
         const totalJobTime = performance.now() - jobStartTime;
 
         // Find longest step

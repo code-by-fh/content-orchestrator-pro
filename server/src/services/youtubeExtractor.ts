@@ -24,7 +24,7 @@ Link zum YouTube Video: ${videoUrl}`;
 
     try {
         const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash', // Use the main model for full generation
+            model: 'gemini-2.5-flash',
             contents: [ytVideo, { text: prompt }],
             config: {
                 mediaResolution: 'MEDIA_RESOLUTION_LOW' as any,

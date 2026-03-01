@@ -21,8 +21,6 @@ async function uploadLocalImageToCMS(localUrl: string, altText: string, articleT
 
     try {
         const fileName = localUrl.substring(localUrl.lastIndexOf('/') + 1);
-        // Correct path relative to where this script runs, assuming from src/services -> uploads is at root/uploads
-        // Wait, __dirname in src/services is dist/services in build. Let's use robust path.
         const filePath = path.join(__dirname, '../../uploads', fileName);
 
         if (!fs.existsSync(filePath)) {
@@ -168,7 +166,6 @@ class PublishingService {
             throw new Error(`No adapter found for platform ${platform}`);
         }
 
-        // 1. Create or update publication record to PENDING
         await prisma.publication.upsert({
             where: { articleId_platform_language: { articleId, platform, language: language as any } },
             create: { articleId, platform, language: language as any, status: 'PENDING' },
@@ -239,7 +236,6 @@ class PublishingService {
         });
 
         if (!pub || !pub.platformId) {
-            // Already unpublished or never published
             return true;
         }
 

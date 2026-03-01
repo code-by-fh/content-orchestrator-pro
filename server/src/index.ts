@@ -3,6 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import dotenv from 'dotenv';
 import path from 'path';
+import fs from 'fs';
 import authRoutes from './routes/authRoutes';
 import contentRoutes from './routes/contentRoutes';
 import distributionRoutes from './routes/distributionRoutes';
@@ -12,12 +13,11 @@ import logger from './utils/logger';
 
 dotenv.config();
 
-// Initialize Scheduler and Worker
 initScheduler();
 import './worker';
 
 const app = express();
-app.set('trust proxy', 1); // Trust first proxy (required for Caprover/Nginx)
+app.set('trust proxy', 1);
 const port = process.env.PORT || 3003;
 
 app.use(helmet({
@@ -28,17 +28,13 @@ app.use(cors({
   credentials: true
 }));
 app.use(express.json());
-
-// Apply general rate limiter
 app.use(generalLimiter);
 
 app.use('/api/auth', authRoutes);
 app.use('/api/content', contentRoutes);
 app.use('/api', distributionRoutes);
 
-// Handle uploads
 const uploadsPath = path.join(__dirname, '../uploads');
-import fs from 'fs';
 if (!fs.existsSync(uploadsPath)) {
   fs.mkdirSync(uploadsPath, { recursive: true });
 }

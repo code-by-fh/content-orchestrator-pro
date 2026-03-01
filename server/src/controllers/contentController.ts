@@ -22,9 +22,6 @@ export const createContent = async (req: Request, res: Response) => {
 
         let slug = title ? title.toLowerCase().replace(/ /g, '-') : `draft-${Date.now()}`;
 
-        // Simple unique check logic or rely on catch
-        // Better to generate unique slug
-
         const article = await prisma.article.create({
             data: {
                 title: title || 'New Draft',
@@ -99,7 +96,6 @@ export const getArticle = async (req: Request, res: Response) => {
     });
     if (!article) return res.status(404).json({ message: 'Article not found' });
 
-    // Add available platforms info
     const platforms = publishingService.getAdapters();
 
     res.json({ ...article, availablePlatforms: platforms });
@@ -126,7 +122,6 @@ export const publishToPlatform = async (req: Request, res: Response) => {
             return res.status(404).json({ message: 'Article not found' });
         }
 
-        // On-the-fly translation for EN if not already cached
         if (language === 'EN') {
             if (!currentArticle.markdownContentEn || !currentArticle.titleEn || !currentArticle.seoTitleEn) {
                 const { translateArticleToEnglish } = await import('../services/translationService');
@@ -229,22 +224,18 @@ export const updateArticle = async (req: Request, res: Response) => {
         if (req.body.ogImageUrl !== undefined) updateData.ogImageUrl = req.body.ogImageUrl;
         if (req.body.category !== undefined) updateData.category = req.body.category;
 
-        // Handle scheduled publishing
         if (reqStatus === 'SCHEDULED' && scheduledAt) {
             updateData.scheduledAt = new Date(scheduledAt);
         }
 
-        // Handle immediate publishing
         if (reqStatus === 'PUBLISHED') {
             updateData.scheduledAt = null; // Clear scheduled time if publishing now
         }
 
-        // Handle unpublish/cancel: clear scheduled date when reverting to DRAFT
         if (reqStatus === 'DRAFT') {
             updateData.scheduledAt = null;
         }
 
-        // Handle explicit scheduledAt clearing (empty string from frontend)
         if (scheduledAt === '') {
             updateData.scheduledAt = null;
         }
@@ -273,7 +264,6 @@ export const reprocessArticle = async (req: Request, res: Response) => {
             data: { processingStatus: 'PENDING' }
         });
 
-        // Determine type based on sourceUrl
         let type: 'YOUTUBE' | 'MEDIUM' = 'YOUTUBE';
         if (article.sourceUrl.includes('medium.com')) {
             type = 'MEDIUM';
@@ -313,7 +303,6 @@ export const getShareUrl = async (req: Request, res: Response) => {
             const backendUrl = process.env.BACKEND_URL || `${req.protocol}://${req.get('host')}`;
             shareUrl = `${backendUrl.endsWith('/') ? backendUrl.slice(0, -1) : backendUrl}/api/rss`;
         } else {
-            // Default to just the article URL if no platform or unsupported
             shareUrl = publicArticleUrl;
         }
 

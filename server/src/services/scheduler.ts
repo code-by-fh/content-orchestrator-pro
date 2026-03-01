@@ -6,7 +6,6 @@ import logger from '../utils/logger';
 const prisma = new PrismaClient();
 
 export const initScheduler = () => {
-    // Run every minute
     cron.schedule('* * * * *', async () => {
         logger.info('[Scheduler] Checking for scheduled articles...');
 
@@ -26,18 +25,12 @@ export const initScheduler = () => {
             }
 
             for (const article of articlesToPublish) {
-                // 1. Mark as no longer scheduled (avoid re-processing)
                 await prisma.article.update({
                     where: { id: article.id },
                     data: {
                         scheduledAt: null,
                     },
                 });
-
-                // 2. Trigger Publication via PublishingService for all configured platforms
-                // Currently defaults to LinkedIn if it was a single postToLinkedIn call before
-                // but we could make this more dynamic based on user intent.
-                // For now, keeping original intent (LinkedIn) but via the proper service.
 
                 await publishingService.publishToPlatform(article.id, Platform.LINKEDIN);
 
@@ -48,5 +41,5 @@ export const initScheduler = () => {
         }
     });
 
-    console.log('[Scheduler] Initialized.');
+    logger.info('[Scheduler] Initialized.');
 };
