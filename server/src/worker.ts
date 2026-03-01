@@ -1,44 +1,15 @@
-import { Worker, Job } from 'bullmq';
+import { GoogleGenAI } from '@google/genai';
 import { PrismaClient } from '@prisma/client';
-import { GoogleGenAI, Type } from '@google/genai';
-import { z } from 'zod';
-import { extractMediumContent } from './services/mediumExtractor';
+import { Job, Worker } from 'bullmq';
 import dotenv from 'dotenv';
-import { exec } from 'child_process';
-import path from 'path';
+import { extractMediumContent } from './services/mediumExtractor';
+import { extractYoutubeTranscript } from './services/youtubeExtractor';
+import { aiResponseSchema, responseSchema, SYSTEM_INSTRUCTION, ValidatedArticle } from './services/aiConfig';
 
 dotenv.config();
 
 const prisma = new PrismaClient();
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-
-// 1. Zod Schema (Wichtig für die Runtime-Validierung)
-const aiResponseSchema = z.object({
-    markdownContent: z.string(),
-    linkedinTeaser: z.string(),
-    xingSummary: z.string(),
-    seoTitle: z.string(),
-    seoDescription: z.string(),
-    slug: z.string(),
-    category: z.string(),
-});
-
-type ValidatedArticle = z.infer<typeof aiResponseSchema>;
-
-// 2. JSON Schema für Gemini
-const responseSchema = {
-    type: Type.OBJECT,
-    properties: {
-        markdownContent: { type: Type.STRING },
-        linkedinTeaser: { type: Type.STRING },
-        xingSummary: { type: Type.STRING },
-        seoTitle: { type: Type.STRING },
-        seoDescription: { type: Type.STRING },
-        slug: { type: Type.STRING },
-        category: { type: Type.STRING },
-    },
-    required: ['markdownContent', 'linkedinTeaser', 'xingSummary', 'seoTitle', 'seoDescription', 'slug', 'category'],
-};
 
 // 3. Robuste KI-Funktion
 async function generateArticleContent(rawText: string): Promise<ValidatedArticle> {
@@ -48,51 +19,7 @@ async function generateArticleContent(rawText: string): Promise<ValidatedArticle
         config: {
             responseMimeType: 'application/json',
             responseSchema: responseSchema,
-            systemInstruction: `Handle als erfahrener Content-Marketer und Copywriter.
-            
-            Aufgabe:
-            Erstelle einen SEO-optimierten Fachartikel im Markdown-Format aus dem bereitgestellten Transkript.
-
-            Anforderungen:
-            - Zielgruppe: Fachpublikum (Entwickler, Data Scientists, Tech-affine Leser)
-            - Tonalität: Professionell, sachlich, locker (kein steifes Deutsch)
-            - Struktur: H1 (Titel), H2 (Kapitel), H3 (Unterkapitel), Bullet Points, Code-Beispiele
-            - SEO: Relevante Keywords natürlich einbauen, keine Keyword-Stuffing
-            - Formatierung: Markdown (keine HTML-Tags)
-            - Länge: mindestens so viele Wörter wie im Transkript vorhanden sind
-            
-            Zusätzliche Outputs (halte dich dabei IMMER an die beschriebene Tonalität und Zielgruppe und gebe diese IMMER in der JSON zurück):
-            - LinkedIn Teaser: Kurzer, knackiger Text (ca. 2-3 Sätze) für LinkedIn.
-            - Xing Summary: Kurze Zusammenfassung für Xing (maximal 319 Zeichen!).
-            - SEO Title: Optimierter Titel für Suchmaschinen.
-            - SEO Description: Ein ansprechender Meta-Description-Text (max. 160 Zeichen).
-            - Slug: URL-freundlicher Slug.
-            - Kategorie: Kategorie für den Artikel.
-            
-            Wichtige Hinweise:
-            - Achte auf korrekte Fachbegriffe
-            - Erkläre komplexe Konzepte verständlich
-            - Füge relevante Code-Beispiele nur ein wenn sie einen echten Mehrwert bieten
-            - Generiere und füge KI-Prompts für Bilder nur ein, wenn sie einen Mehrwert für den Artikel bieten
-            - Strukturiere den Text logisch und lesefreundlich
-            - Vermeide Wiederholungen
-            - Halte dich an die deutsche Sprache
-            - Halte dich an die Fakten und Behauptungen des Transkripts und haluziniere keine Fakten oder Behauptungen!
-            - Bilder im Markdown können durch URL-Fragmente gesteuert werden: Nutze ![Alt-Text](url#width50-center) für 50% Breite und Zentrierung. Mögliche Werte für Alignment: left, center, right. Standard ist width100-center.
-            
-            Input:
-            {rawText}
-            
-            Output-Format (JSON):
-            {
-                "markdownContent": "...",
-                "linkedinTeaser": "...",
-                "xingSummary": "...",
-                "seoTitle": "...",
-                "seoDescription": "...",
-                "slug": "...",
-                "category": "..."
-            }`
+            systemInstruction: SYSTEM_INSTRUCTION,
         }
     });
 
@@ -114,6 +41,12 @@ const worker = new Worker('content-queue', async (job: Job) => {
     console.log(`======================================================`);
 
     try {
+        const article = await prisma.article.findUnique({ where: { id: articleId } });
+        if (!article) {
+            console.warn(`⚠️ [Job Skipped] Article ${articleId} not found in database. It might have been deleted.`);
+            return;
+        }
+
         const dbStart = performance.now();
         await prisma.article.update({
             where: { id: articleId },
@@ -122,42 +55,36 @@ const worker = new Worker('content-queue', async (job: Job) => {
         const initialDbTime = performance.now() - dbStart;
         console.log(`[Status Update] Set to PROCESSING in ${initialDbTime.toFixed(2)}ms`);
 
-        let rawText = '';
+        let validatedData: ValidatedArticle;
+        let extractionTime = 0;
+        let generationTime = 0;
 
-        // --- Step 1: Extraction ---
-        console.log(`\n⏳ [Step 1: Extraction] Starting ${type} text extraction...`);
-        const extractionStart = performance.now();
-
+        // --- Step 1 & 2: Content Acquisition ---
         if (type === 'YOUTUBE') {
             const videoId = sourceUrl.match(/(?:v=|\/)([\w-]{11})(?:\?|&|\/|$)/)?.[1];
             if (!videoId) throw new Error('Ungültige YouTube URL');
 
-            rawText = await new Promise<string>((resolve, reject) => {
-                const scriptPath = path.join(__dirname, '../scripts/extract_transcript.py');
-                const execStart = performance.now();
-                exec(`python3 "${scriptPath}" "${videoId}"`, (error, stdout, stderr) => {
-                    if (error) {
-                        console.error(`[Extraction Error] Python script failed after ${(performance.now() - execStart).toFixed(2)}ms: ${stderr}`);
-                        return reject(new Error(stderr));
-                    }
-                    const res = JSON.parse(stdout);
-                    res.success ? resolve(res.text) : reject(new Error(res.error));
-                });
-            });
+            console.log(`\n⏳ [Step 1&2: Extraction & Generation] Starting YouTube processing...`);
+            const processStart = performance.now();
+            validatedData = await extractYoutubeTranscript(sourceUrl);
+            extractionTime = performance.now() - processStart;
+            generationTime = 0; // Integrated in extraction/processing for YT
+            console.log(`✅ [Step 1&2] Completed in ${extractionTime.toFixed(2)}ms.`);
         } else if (type === 'MEDIUM') {
-            rawText = await extractMediumContent(sourceUrl);
+            console.log(`\n⏳ [Step 1: Extraction] Starting Medium text extraction...`);
+            const extractionStart = performance.now();
+            const rawText = await extractMediumContent(sourceUrl);
+            extractionTime = performance.now() - extractionStart;
+            console.log(`✅ [Step 1: Extraction] Completed in ${extractionTime.toFixed(2)}ms. Extracted ${rawText.length} characters.`);
+
+            console.log(`\n🧠 [Step 2: AI Generation] Sending characters to Gemini...`);
+            const generationStart = performance.now();
+            validatedData = await generateArticleContent(rawText);
+            generationTime = performance.now() - generationStart;
+            console.log(`✅ [Step 2: AI Generation] Completed in ${generationTime.toFixed(2)}ms.`);
+        } else {
+            throw new Error(`Unsupported type: ${type}`);
         }
-
-        const extractionTime = performance.now() - extractionStart;
-        console.log(`✅ [Step 1: Extraction] Completed in ${extractionTime.toFixed(2)}ms. Extracted ${rawText.length} characters.`);
-
-        // --- Step 2: AI Generation ---
-        console.log(`\n🧠 [Step 2: AI Generation] Sending ${rawText.length} characters to Gemini...`);
-        const generationStart = performance.now();
-        const validatedData = await generateArticleContent(rawText);
-        const generationTime = performance.now() - generationStart;
-
-        console.log(`✅ [Step 2: AI Generation] Completed in ${generationTime.toFixed(2)}ms.`);
 
         // --- Step 3: Database Update ---
         console.log(`\n💾 [Step 3: DB Update] Saving results to database...`);
@@ -169,12 +96,12 @@ const worker = new Worker('content-queue', async (job: Job) => {
                 markdownContent: validatedData.markdownContent,
                 linkedinTeaser: validatedData.linkedinTeaser,
                 xingSummary: validatedData.xingSummary,
-                title: validatedData.seoTitle, // keep title as seoTitle for now
+                title: validatedData.seoTitle,
                 seoTitle: validatedData.seoTitle,
                 seoDescription: validatedData.seoDescription,
                 slug: validatedData.slug,
                 category: validatedData.category,
-                rawTranscript: rawText,
+                rawTranscript: validatedData.rawTranscript,
                 processingStatus: 'DRAFT'
             },
         });
