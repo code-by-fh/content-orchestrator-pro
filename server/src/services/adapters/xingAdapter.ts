@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { Article, Platform } from '@prisma/client';
 import { PlatformAdapter, PublishResult } from './types';
+import logger from '../../utils/logger';
 
 export class XingAdapter implements PlatformAdapter {
     platform = Platform.XING;
@@ -36,7 +37,7 @@ export class XingAdapter implements PlatformAdapter {
                 }
             );
 
-            console.log('[XingAdapter] Successfully posted:', response.data);
+            logger.info(`[XingAdapter] Successfully posted: ${JSON.stringify(response.data)}`);
 
             // The response for shares usually contains an array of IDs or a single ID depending on version
             const platformId = response.data?.ids?.[0] || response.data?.id || 'xing_share_' + Date.now();
@@ -47,7 +48,7 @@ export class XingAdapter implements PlatformAdapter {
             };
         } catch (error: any) {
             const errorData = error.response?.data || error.message;
-            console.error('[XingAdapter] Error posting to Xing:', errorData);
+            logger.error(`[XingAdapter] Error posting to Xing: ${JSON.stringify(errorData)}`);
 
             // Improved error extraction for complex Xing error objects
             let errorMessage = 'Unknown Xing error';
@@ -67,7 +68,7 @@ export class XingAdapter implements PlatformAdapter {
     async unpublish(articleId: string, platformId: string, accessToken?: string, language: string = 'DE'): Promise<boolean> {
         if (!accessToken || !platformId) return false;
 
-        console.log(`[XingAdapter] Attempting to unpublish share ${platformId}`);
+        logger.info(`[XingAdapter] Attempting to unpublish share ${platformId}`);
         // Note: Xing API v1 unpublishing of shares is often not available via public endpoints
         // but we log it as an attempt for consistency.
         return true;

@@ -1,5 +1,6 @@
 import { Article, Platform } from '@prisma/client';
 import { PlatformAdapter, PublishResult } from './types';
+import logger from '../../utils/logger';
 
 export class RssAdapter implements PlatformAdapter {
     platform = Platform.RSS;
@@ -11,7 +12,7 @@ export class RssAdapter implements PlatformAdapter {
         // specifically for the RSS platform, 'publishing' to RSS confirms visibility there.
         // The PublishingService will handle the status transition for the RSS publication record.
 
-        console.log(`[RssAdapter] Article "${article.title}" is now eligible for the RSS feed.`);
+        logger.info(`[RssAdapter] Article "${article.title}" is now eligible for the RSS feed.`);
 
         return {
             success: true,
@@ -21,7 +22,7 @@ export class RssAdapter implements PlatformAdapter {
 
     async unpublish(articleId: string, platformId: string, accessToken?: string, language: string = 'DE'): Promise<boolean> {
         // Unpublishing from RSS is handled by changing the article status or deleting the publication record.
-        console.log(`[RssAdapter] Article with ID ${articleId} removed from RSS eligibility.`);
+        logger.info(`[RssAdapter] Article with ID ${articleId} removed from RSS eligibility.`);
         return true;
     }
 }

@@ -1,6 +1,7 @@
 import { GoogleGenAI } from '@google/genai';
 import dotenv from 'dotenv';
 import { aiResponseSchema, responseSchema, SYSTEM_INSTRUCTION, ValidatedArticle } from './aiConfig';
+import logger from '../utils/logger';
 
 dotenv.config();
 
@@ -41,7 +42,7 @@ Link zum YouTube Video: ${videoUrl}`;
         const jsonData = JSON.parse(text);
         return aiResponseSchema.parse(jsonData);
     } catch (error: any) {
-        console.error(`[YouTube Extractor Error] Failed to process ${videoUrl}:`, error);
+        logger.error(`[YouTube Extractor Error] Failed to process ${videoUrl}: ${error.message}`);
         throw new Error(`Fehler bei der Analyse des YouTube Videos: ${error.message || 'Unbekannter Fehler'}`);
     }
 }

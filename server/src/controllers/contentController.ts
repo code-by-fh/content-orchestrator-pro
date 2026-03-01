@@ -4,6 +4,7 @@ import { publishingService } from '../services/publishingService';
 
 import { z } from 'zod';
 import { addContentJob } from '../queue/producer';
+import logger from '../utils/logger';
 
 const prisma = new PrismaClient();
 
@@ -17,7 +18,7 @@ export const createContent = async (req: Request, res: Response) => {
     try {
         const { url, type, title } = createContentSchema.parse(req.body);
 
-        console.log(`[Content] Received request to generate article from ${type} URL: ${url}`);
+        logger.info(`[Content] Received request to generate article from ${type} URL: ${url}`);
 
         let slug = title ? title.toLowerCase().replace(/ /g, '-') : `draft-${Date.now()}`;
 
@@ -37,11 +38,11 @@ export const createContent = async (req: Request, res: Response) => {
 
         await addContentJob(article.id, type, url);
 
-        console.log(`[Content] Successfully queued job for new article (ID: ${article.id})`);
+        logger.info(`[Content] Successfully queued job for new article (ID: ${article.id})`);
 
         res.json(article);
-    } catch (error) {
-        console.error(error);
+    } catch (error: any) {
+        logger.error(`[Content] Create article error: ${error.message || 'Unknown error'}`);
         res.status(400).json({ message: 'Invalid request or failed to create article' });
     }
 };
@@ -140,7 +141,7 @@ export const publishToPlatform = async (req: Request, res: Response) => {
             res.status(500).json({ message: `Failed to publish to ${platform}`, error: result.error });
         }
     } catch (error: any) {
-        console.error(error);
+        logger.error(`[Content] Publish to platform error: ${error.message || 'Unknown error'}`);
         res.status(500).json({ message: error.message || 'Internal server error' });
     }
 };
@@ -157,7 +158,7 @@ export const unpublishFromPlatform = async (req: Request, res: Response) => {
         await publishingService.unpublishFromPlatform(id, platform as Platform, undefined, language);
         res.json({ message: `Successfully unpublished from ${platform} in ${language}` });
     } catch (error: any) {
-        console.error(error);
+        logger.error(`[Content] Unpublish from platform error: ${error.message || 'Unknown error'}`);
         res.status(500).json({ message: error.message || 'Internal server error' });
     }
 };
@@ -177,7 +178,7 @@ export const unpublishAllPlatforms = async (req: Request, res: Response) => {
 
         res.json({ message: `Successfully unpublished from all platforms` });
     } catch (error: any) {
-        console.error(error);
+        logger.error(`[Content] Unpublish all error: ${error.message || 'Unknown error'}`);
         res.status(500).json({ message: error.message || 'Internal server error' });
     }
 };
@@ -205,8 +206,8 @@ export const deleteArticle = async (req: Request, res: Response) => {
 
         await prisma.article.delete({ where: { id: id as string } });
         res.status(204).send();
-    } catch (error) {
-        console.error(error);
+    } catch (error: any) {
+        logger.error(`[Content] Delete article error: ${error.message || 'Unknown error'}`);
         res.status(500).json({ message: 'Failed to delete article' });
     }
 };
@@ -253,15 +254,15 @@ export const updateArticle = async (req: Request, res: Response) => {
             data: updateData,
         });
         res.json(article);
-    } catch (error) {
-        console.error(error);
+    } catch (error: any) {
+        logger.error(`[Content] Update article error: ${error.message || 'Unknown error'}`);
         res.status(500).json({ message: 'Failed to update article' });
     }
 };
 
 export const reprocessArticle = async (req: Request, res: Response) => {
     const { id } = req.params;
-    console.log(`[Content] Received request to reprocess article (ID: ${id})`);
+    logger.info(`[Content] Received request to reprocess article (ID: ${id})`);
 
     try {
         const article = await prisma.article.findUnique({ where: { id: id as string } });
@@ -280,11 +281,11 @@ export const reprocessArticle = async (req: Request, res: Response) => {
 
         await addContentJob(article.id, type, article.sourceUrl);
 
-        console.log(`[Content] Successfully re-queued job for article (ID: ${article.id})`);
+        logger.info(`[Content] Successfully re-queued job for article (ID: ${article.id})`);
 
         res.json({ message: 'Re-processing started' });
-    } catch (error) {
-        console.error(error);
+    } catch (error: any) {
+        logger.error(`[Content] Reprocess article error: ${error.message || 'Unknown error'}`);
         res.status(500).json({ message: 'Failed to re-process article' });
     }
 };
@@ -317,8 +318,8 @@ export const getShareUrl = async (req: Request, res: Response) => {
         }
 
         res.json({ shareUrl });
-    } catch (error) {
-        console.error(error);
+    } catch (error: any) {
+        logger.error(`[Content] Get share URL error: ${error.message || 'Unknown error'}`);
         res.status(500).json({ message: 'Failed to generate share URL' });
     }
 };
@@ -334,8 +335,8 @@ export const uploadImage = async (req: Request, res: Response) => {
         const imageUrl = `${baseUrl}/uploads/${fileName}`;
 
         res.json({ imageUrl });
-    } catch (error) {
-        console.error(error);
+    } catch (error: any) {
+        logger.error(`[Content] Upload image error: ${error.message || 'Unknown error'}`);
         res.status(500).json({ message: 'Failed to upload image' });
     }
 };

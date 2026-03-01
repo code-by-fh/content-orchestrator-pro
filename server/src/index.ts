@@ -8,6 +8,7 @@ import contentRoutes from './routes/contentRoutes';
 import distributionRoutes from './routes/distributionRoutes';
 import { generalLimiter } from './middleware/rateLimit';
 import { initScheduler } from './services/scheduler';
+import logger from './utils/logger';
 
 dotenv.config();
 
@@ -44,5 +45,5 @@ if (!fs.existsSync(uploadsPath)) {
 app.use('/uploads', express.static(uploadsPath));
 
 app.listen(port, () => {
-  console.log(`Server is running at http://localhost:${port}`);
+  logger.info(`Server is running at http://localhost:${port}`);
 });

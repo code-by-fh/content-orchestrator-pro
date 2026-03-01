@@ -1,13 +1,14 @@
 import cron from 'node-cron';
 import { PrismaClient, Platform } from '@prisma/client';
 import { publishingService } from './publishingService';
+import logger from '../utils/logger';
 
 const prisma = new PrismaClient();
 
 export const initScheduler = () => {
     // Run every minute
     cron.schedule('* * * * *', async () => {
-        console.log('[Scheduler] Checking for scheduled articles...');
+        logger.info('[Scheduler] Checking for scheduled articles...');
 
         try {
             const now = new Date();
@@ -21,7 +22,7 @@ export const initScheduler = () => {
             });
 
             if (articlesToPublish.length > 0) {
-                console.log(`[Scheduler] Found ${articlesToPublish.length} articles to publish.`);
+                logger.info(`[Scheduler] Found ${articlesToPublish.length} articles to publish.`);
             }
 
             for (const article of articlesToPublish) {
@@ -40,10 +41,10 @@ export const initScheduler = () => {
 
                 await publishingService.publishToPlatform(article.id, Platform.LINKEDIN);
 
-                console.log(`[Scheduler] Published article ${article.id} to LinkedIn`);
+                logger.info(`[Scheduler] Published article ${article.id} to LinkedIn`);
             }
-        } catch (error) {
-            console.error('[Scheduler] Error:', error);
+        } catch (error: any) {
+            logger.error(`[Scheduler] Error: ${error.message}`);
         }
     });
 

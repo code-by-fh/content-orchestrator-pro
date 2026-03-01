@@ -1,7 +1,7 @@
 import { Type } from '@google/genai';
 import { z } from 'zod';
 
-// Zod Schema for validation and typing
+// Zod Schema for validation and typing removed as requested
 export const aiResponseSchema = z.object({
     markdownContent: z.string(),
     linkedinTeaser: z.string(),

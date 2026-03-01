@@ -2,6 +2,7 @@ import { PrismaClient, Article } from '@prisma/client';
 import { GoogleGenAI, Type } from '@google/genai';
 import { z } from 'zod';
 import dotenv from 'dotenv';
+import logger from '../utils/logger';
 
 dotenv.config();
 
@@ -62,7 +63,7 @@ export async function translateArticleToEnglish(articleId: string): Promise<Arti
         return article;
     }
 
-    console.log(`\n🌍 [Translation] Starting EN translation for article: ${articleId}`);
+    logger.info(`\n🌍 [Translation] Starting EN translation for article: ${articleId}`);
     const translationStart = performance.now();
 
     // Prepare the input text containing all DE fields
@@ -131,7 +132,7 @@ export async function translateArticleToEnglish(articleId: string): Promise<Arti
     });
 
     const translationTime = performance.now() - translationStart;
-    console.log(`✅ [Translation] Completed EN translation for article ${articleId} in ${translationTime.toFixed(2)}ms.`);
+    logger.info(`✅ [Translation] Completed EN translation for article ${articleId} in ${translationTime.toFixed(2)}ms.`);
 
     return updatedArticle;
 }

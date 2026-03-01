@@ -7,6 +7,7 @@ import { RssAdapter } from './adapters/rssAdapter';
 import { PlatformAdapter } from './adapters/types';
 import { WebhookAdapter } from './adapters/webhookAdapter';
 import { XingAdapter } from './adapters/xingAdapter';
+import logger from '../utils/logger';
 
 const prisma = new PrismaClient();
 
@@ -25,7 +26,7 @@ async function uploadLocalImageToCMS(localUrl: string, altText: string, articleT
         const filePath = path.join(__dirname, '../../uploads', fileName);
 
         if (!fs.existsSync(filePath)) {
-            console.error(`Local file not found for upload: ${filePath}`);
+            logger.error(`Local file not found for upload: ${filePath}`);
             return null;
         }
 
@@ -75,10 +76,10 @@ async function uploadLocalImageToCMS(localUrl: string, altText: string, articleT
 
             try {
                 if (fs.existsSync(filePath)) {
-                    fs.promises.unlink(filePath).catch(e => console.error('Failed to unlink local image:', e));
+                    fs.promises.unlink(filePath).catch(e => logger.error(`Failed to unlink local image: ${e.message}`));
                 }
-            } catch (e) {
-                console.error('Failed to delete local file', e);
+            } catch (e: any) {
+                logger.error(`Failed to delete local file: ${e.message}`);
             }
 
             return newImageUrl;
@@ -91,7 +92,7 @@ async function uploadLocalImageToCMS(localUrl: string, altText: string, articleT
 }
 
 async function processImages(articleId: string, markdownContent: string | null, language: string, articleTitle: string): Promise<string | null> {
-    console.log('Processing images for article', articleId);
+    logger.info(`Processing images for article ${articleId}`);
     const cmsUrl = process.env.CONTENT_MANAGEMENT_IMAGE_URL;
     const cmsToken = process.env.CONTENT_MANAGEMENT_TOKEN;
 
@@ -187,7 +188,7 @@ class PublishingService {
 
         // Handle ogImageUrl if it's a local upload
         if (publishedArticle.ogImageUrl && publishedArticle.ogImageUrl.includes('/uploads/')) {
-            console.log('Uploading ogImageUrl to CMS...');
+            logger.info('Uploading ogImageUrl to CMS...');
             const newOgImageUrl = await uploadLocalImageToCMS(
                 publishedArticle.ogImageUrl,
                 `${publishedArticle.title} OG Image`,
