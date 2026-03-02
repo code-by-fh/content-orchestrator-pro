@@ -78,3 +78,19 @@ When you publish an article containing local images, the system performs the fol
 - **CMS Integration**: Once `CONTENT_MANAGEMENT_IMAGE_URL` is configured, all local `/uploads/` images will be migrated upon first publication.
 - **Queue System**: Uses Redis for robust AI generation. Ensure your Redis server is accessible via the parameters specified in the `.env`.
 - **YouTube Extraction**: Requires Python in the system environment. Install the dependency with: `pip install youtube-transcript-api`.
+
+## 💾 Data Storage & Persistence
+
+To ensure that your articles and media are not lost after a deployment or restart, please consider the following:
+
+### 1. Article Content (Text)
+All article texts, metadata, and status information are stored in the **PostgreSQL database**. Ensure that your database instance (e.g., in CapRover or Docker) uses a persistent volume.
+
+### 2. Media & Images (Uploads)
+Images that you drag into the editor or upload are temporarily stored on the server in the `/app/uploads` folder.
+
+> [!IMPORTANT]
+> This folder **MUST** be mounted on the host, otherwise it will be deleted with every new deployment.
+
+### 3. Background Jobs
+The queue for AI generation is stored in **Redis**. Since this is only temporary job data, persistence here is optional but recommended for seamless processing.

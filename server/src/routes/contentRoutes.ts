@@ -6,7 +6,6 @@ import { authenticateToken } from '../middleware/auth';
 
 const router = Router();
 
-// Configure multer for image uploads
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
         cb(null, path.join(__dirname, '../../uploads'));

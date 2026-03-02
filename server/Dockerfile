@@ -2,21 +2,15 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# Install dependencies
 RUN apk add --no-cache openssl python3 py3-pip
 RUN pip install --break-system-packages youtube-transcript-api
 COPY package*.json ./
 RUN npm install
 
-# Copy application code
 COPY . .
 
-# Generate Prisma Client
 RUN npx prisma generate
-# Build TypeScript code
 RUN npm run build
 
 EXPOSE 3003
-
-# Command starts migrate and the built app
 CMD ["sh", "-c", "npx prisma migrate deploy && npm start"]
