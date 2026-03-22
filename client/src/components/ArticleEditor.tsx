@@ -1,4 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { EditorView, keymap, placeholder as cmPlaceholder } from '@codemirror/view';
+import { EditorState } from '@codemirror/state';
+import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
+import { imageDecorationExtension } from './editor/imageWidget';
+import { editorTheme } from './editor/cmTheme';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import ReactMarkdown from 'react-markdown';
@@ -50,6 +55,24 @@ import { ConfirmationModal } from './ui/ConfirmationModal';
 import { Tooltip } from './ui/Tooltip';
 import { Badge } from './ui/Badge';
 
+// CodeMirror helper functions (defined outside component to avoid re-creation)
+function cmInsertAround(view: EditorView, before: string, after: string) {
+    const { from, to } = view.state.selection.main;
+    const selected = view.state.sliceDoc(from, to);
+    view.dispatch({
+        changes: { from, to, insert: before + selected + after },
+        selection: { anchor: from + before.length, head: from + before.length + selected.length },
+    });
+}
+
+function cmInsertAtLineStart(view: EditorView, prefix: string) {
+    const line = view.state.doc.lineAt(view.state.selection.main.from);
+    view.dispatch({
+        changes: { from: line.from, insert: prefix },
+        selection: { anchor: line.from + prefix.length },
+    });
+}
+
 export const ArticleEditor: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
@@ -82,9 +105,12 @@ export const ArticleEditor: React.FC = () => {
     const [orientation, setOrientation] = useState<'horizontal' | 'vertical'>('horizontal');
     const panelGroupRef = useRef<any>(null);
 
-    const textareaRef = useRef<HTMLTextAreaElement>(null);
+    const editorViewRef = useRef<EditorView | null>(null);
+    const editorContainerRef = useRef<HTMLDivElement>(null);
     const previewRef = useRef<HTMLDivElement>(null);
     const isScrollingRef = useRef<boolean>(false);
+    // Stable refs for handlers used inside the CodeMirror mount effect
+    const handleSaveRef = useRef<(isAutoSave?: boolean) => void>(() => {});
 
     const { data: article, isLoading } = useQuery({
         queryKey: ['article', id],
@@ -117,7 +143,19 @@ export const ArticleEditor: React.FC = () => {
 
     useEffect(() => {
         if (article) {
-            if (article.markdownContent) setContent(article.markdownContent);
+            if (article.markdownContent) {
+                setContent(article.markdownContent);
+                // Sync into CodeMirror if already mounted
+                const view = editorViewRef.current;
+                if (view) {
+                    const currentDoc = view.state.doc.toString();
+                    if (currentDoc !== article.markdownContent) {
+                        view.dispatch({
+                            changes: { from: 0, to: view.state.doc.length, insert: article.markdownContent }
+                        });
+                    }
+                }
+            }
             setSeoTitle(article.seoTitle || article.title || '');
             setSeoDescription(article.seoDescription || '');
             setLinkedinTeaser(article.linkedinTeaser || '');
@@ -218,6 +256,11 @@ export const ArticleEditor: React.FC = () => {
         });
     };
 
+    // Keep handleSaveRef in sync so the CodeMirror keymap closure stays up-to-date
+    useEffect(() => {
+        handleSaveRef.current = handleSave;
+    });
+
     const handlePublish = () => {
         setShowPublishModal(true);
     };
@@ -278,121 +321,107 @@ export const ArticleEditor: React.FC = () => {
         return () => clearTimeout(timer);
     }, [content, seoTitle, seoDescription, linkedinTeaser, xingSummary]);
 
-    const handlePaste = async (e: React.ClipboardEvent) => {
-        const items = e.clipboardData.items;
-        for (let i = 0; i < items.length; i++) {
-            if (items[i].type.indexOf('image') !== -1) {
-                const file = items[i].getAsFile();
-                if (file) {
-                    e.preventDefault();
+    // CodeMirror mount effect — runs when the article is ready (container div in DOM)
+    useEffect(() => {
+        if (!editorContainerRef.current || editorViewRef.current) return;
 
-                    // Insert placeholder
-                    const placeholder = `![Uploading image...]()`;
-                    const textarea = textareaRef.current;
-                    if (!textarea) return;
+        const view = new EditorView({
+            state: EditorState.create({
+                doc: article?.markdownContent ?? '',
+                extensions: [
+                    history(),
+                    imageDecorationExtension,
+                    editorTheme,
+                    EditorView.lineWrapping,
+                    cmPlaceholder('Start writing your masterpiece...'),
+                    keymap.of([
+                        { key: 'Ctrl-b', mac: 'Cmd-b', run: (v) => { cmInsertAround(v, '**', '**'); return true; } },
+                        { key: 'Ctrl-i', mac: 'Cmd-i', run: (v) => { cmInsertAround(v, '*', '*'); return true; } },
+                        { key: 'Ctrl-k', mac: 'Cmd-k', run: (v) => { cmInsertAround(v, '[', '](url)'); return true; } },
+                        { key: 'Ctrl-s', mac: 'Cmd-s', run: () => { handleSaveRef.current(false); return true; } },
+                        { key: 'Ctrl-1', run: (v) => { cmInsertAtLineStart(v, '# '); return true; } },
+                        { key: 'Ctrl-2', run: (v) => { cmInsertAtLineStart(v, '## '); return true; } },
+                        { key: 'Ctrl-3', run: (v) => { cmInsertAtLineStart(v, '### '); return true; } },
+                        { key: 'Ctrl-l', mac: 'Cmd-l', run: (v) => { cmInsertAtLineStart(v, '- '); return true; } },
+                        ...defaultKeymap,
+                        ...historyKeymap,
+                    ]),
+                    EditorView.updateListener.of((u) => {
+                        if (u.docChanged) {
+                            setContent(u.state.doc.toString());
+                        }
+                    }),
+                    EditorView.domEventHandlers({
+                        paste: (event, view) => {
+                            const items = event.clipboardData?.items;
+                            if (!items) return false;
+                            for (let i = 0; i < items.length; i++) {
+                                if (items[i].type.startsWith('image/')) {
+                                    const file = items[i].getAsFile();
+                                    if (!file) continue;
+                                    event.preventDefault();
+                                    const placeholder = `![Uploading image...]()`;
+                                    const { from, to } = view.state.selection.main;
+                                    view.dispatch({ changes: { from, to, insert: placeholder } });
+                                    // Fire-and-forget: async upload, then patch doc
+                                    uploadImage(file).then(({ imageUrl }) => {
+                                        const final = `![Image](${imageUrl}#width60-center)`;
+                                        const doc = view.state.doc.toString();
+                                        const idx = doc.indexOf(placeholder);
+                                        if (idx !== -1) {
+                                            view.dispatch({ changes: { from: idx, to: idx + placeholder.length, insert: final } });
+                                        }
+                                    }).catch(() => {
+                                        toast.error('Failed to upload image');
+                                        const doc = view.state.doc.toString();
+                                        const idx = doc.indexOf(placeholder);
+                                        if (idx !== -1) {
+                                            view.dispatch({ changes: { from: idx, to: idx + placeholder.length, insert: '' } });
+                                        }
+                                    });
+                                    return true;
+                                }
+                            }
+                            return false;
+                        },
+                        scroll: (_event, view) => {
+                            if (isScrollingRef.current || !previewRef.current) return false;
+                            const scroller = view.scrollDOM;
+                            const { scrollTop, scrollHeight, clientHeight } = scroller;
+                            const maxScroll = scrollHeight - clientHeight;
+                            if (maxScroll <= 0) return false;
+                            isScrollingRef.current = true;
+                            const ratio = scrollTop / maxScroll;
+                            const preview = previewRef.current;
+                            preview.scrollTop = ratio * (preview.scrollHeight - preview.clientHeight);
+                            setTimeout(() => { isScrollingRef.current = false; }, 10);
+                            return false;
+                        },
+                    }),
+                ],
+            }),
+            parent: editorContainerRef.current,
+        });
 
-                    const start = textarea.selectionStart;
-                    const end = textarea.selectionEnd;
-                    const beforeText = content.substring(0, start);
-                    const afterText = content.substring(end);
-
-                    setContent(beforeText + placeholder + afterText);
-
-                    try {
-                        const { imageUrl } = await uploadImage(file);
-                        const finalMarkdown = `![Image](${imageUrl}#width60-center)`;
-
-                        // Replace placeholder with final markdown
-                        setContent(prev => prev.replace(placeholder, finalMarkdown));
-                    } catch (error) {
-                        toast.error('Failed to upload image');
-                        // Remove placeholder on failure
-                        setContent(prev => prev.replace(placeholder, ''));
-                    }
-                }
-            }
-        }
-    };
+        editorViewRef.current = view;
+        return () => {
+            view.destroy();
+            editorViewRef.current = null;
+        };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [article?.id]); // Re-run when article loads so the container div is in the DOM
 
     const insertText = (before: string, after: string = '') => {
-        const textarea = textareaRef.current;
-        if (!textarea) return;
-
-        const start = textarea.selectionStart;
-        const end = textarea.selectionEnd;
-        const selectedText = content.substring(start, end);
-        const newText = content.substring(0, start) + before + selectedText + after + content.substring(end);
-
-        setContent(newText);
-
-        setTimeout(() => {
-            textarea.focus();
-            textarea.setSelectionRange(start + before.length, end + before.length);
-        }, 0);
-    };
-
-    const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-        if (e.ctrlKey || e.metaKey) {
-            switch (e.key.toLowerCase()) {
-                case 'b':
-                    e.preventDefault();
-                    insertText('**', '**');
-                    break;
-                case 'i':
-                    e.preventDefault();
-                    insertText('*', '*');
-                    break;
-                case 'k':
-                    e.preventDefault();
-                    insertText('[', '](url)');
-                    break;
-                case 's':
-                    e.preventDefault();
-                    handleSave(false);
-                    break;
-                case '1':
-                    e.preventDefault();
-                    insertText('# ');
-                    break;
-                case '2':
-                    e.preventDefault();
-                    insertText('## ');
-                    break;
-                case '3':
-                    e.preventDefault();
-                    insertText('### ');
-                    break;
-                case 'l':
-                    e.preventDefault();
-                    insertText('- ');
-                    break;
-            }
-        }
-    };
-
-    const handleEditorScroll = (e: React.UIEvent<HTMLTextAreaElement>) => {
-        if (isScrollingRef.current) return;
-        if (!textareaRef.current || !previewRef.current) return;
-
-        const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
-        const maxScroll = scrollHeight - clientHeight;
-        if (maxScroll <= 0) return;
-
-        isScrollingRef.current = true;
-        const scrollRatio = scrollTop / maxScroll;
-
-        const preview = previewRef.current;
-        preview.scrollTop = scrollRatio * (preview.scrollHeight - preview.clientHeight);
-
-        // Reset the flag after a short delay to avoid feedback loops
-        setTimeout(() => {
-            isScrollingRef.current = false;
-        }, 10);
+        const view = editorViewRef.current;
+        if (!view) return;
+        cmInsertAround(view, before, after);
+        view.focus();
     };
 
     const handlePreviewScroll = (e: React.UIEvent<HTMLDivElement>) => {
-        if (isScrollingRef.current) return;
-        if (!textareaRef.current || !previewRef.current) return;
+        if (isScrollingRef.current || !previewRef.current) return;
+        const view = editorViewRef.current;
+        if (!view) return;
 
         const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
         const maxScroll = scrollHeight - clientHeight;
@@ -400,9 +429,8 @@ export const ArticleEditor: React.FC = () => {
 
         isScrollingRef.current = true;
         const scrollRatio = scrollTop / maxScroll;
-
-        const textarea = textareaRef.current;
-        textarea.scrollTop = scrollRatio * (textarea.scrollHeight - textarea.clientHeight);
+        const editorMaxScroll = view.scrollDOM.scrollHeight - view.scrollDOM.clientHeight;
+        view.scrollDOM.scrollTop = scrollRatio * editorMaxScroll;
 
         setTimeout(() => {
             isScrollingRef.current = false;
@@ -410,26 +438,17 @@ export const ArticleEditor: React.FC = () => {
     };
 
     const applyTextAlign = (align: 'left' | 'center' | 'right') => {
-        const textarea = textareaRef.current;
-        if (!textarea) return;
-
-        const start = textarea.selectionStart;
-        const end = textarea.selectionEnd;
-        const selectedText = content.substring(start, end);
-
-        if (selectedText) {
-            const before = `<div align="${align}">\n`;
-            const after = `\n</div>`;
-            const newText = content.substring(0, start) + before + selectedText + after + content.substring(end);
-            setContent(newText);
-
-            setTimeout(() => {
-                textarea.focus();
-                textarea.setSelectionRange(start + before.length, start + before.length + selectedText.length);
-            }, 0);
-        } else {
-            insertText(`<div align="${align}">\n`, `\n</div>`);
-        }
+        const view = editorViewRef.current;
+        if (!view) return;
+        const { from, to } = view.state.selection.main;
+        const selectedText = view.state.sliceDoc(from, to);
+        const before = `<div align="${align}">\n`;
+        const after = `\n</div>`;
+        view.dispatch({
+            changes: { from, to, insert: before + selectedText + after },
+            selection: { anchor: from + before.length, head: from + before.length + selectedText.length },
+        });
+        view.focus();
     };
 
     if (isLoading) return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin text-primary" /></div>;
@@ -788,22 +807,13 @@ export const ArticleEditor: React.FC = () => {
                                         </div>
 
 
-                                        <div className="flex-1 flex flex-col relative bg-background">
+                                        <div className="flex-1 flex flex-col relative bg-background overflow-hidden">
                                             <div className="absolute top-4 left-4 z-10 px-2 py-1 rounded bg-muted/50 text-[9px] uppercase tracking-widest font-bold text-muted-foreground pointer-events-none">
                                                 Editor
                                             </div>
-                                            <textarea
-                                                ref={textareaRef}
-                                                onScroll={handleEditorScroll}
-                                                onPaste={handlePaste}
-                                                onKeyDown={handleKeyDown}
-                                                value={content}
-                                                onChange={(e) => setContent(e.target.value)}
-                                                placeholder="Start writing your masterpiece..."
-                                                className="flex-1 w-full p-4 pb-[7vh] pt-[5vh] resize-none bg-transparent focus:outline-none font-mono text-sm leading-relaxed text-foreground/80 placeholder:text-muted-foreground/30 selection:bg-indigo-500/20 custom-scrollbar"
-
-
-
+                                            <div
+                                                ref={editorContainerRef}
+                                                className="flex-1 overflow-hidden [&_.cm-editor]:h-full [&_.cm-editor]:outline-none [&_.cm-scroller]:custom-scrollbar [&_.cm-content]:text-foreground/80"
                                             />
                                         </div>
                                     </Panel>
@@ -823,7 +833,8 @@ export const ArticleEditor: React.FC = () => {
                                                 prose prose-slate dark:prose-invert
                                                 text-foreground/80 dark:text-gray-100
                                                 dark:prose-headings:text-white
-                                                prose-sm md:prose-base">
+                                                prose-sm md:prose-base
+                                                selection:bg-indigo-500 selection:text-white">
                                                 <ReactMarkdown
                                                     remarkPlugins={[remarkGfm]}
                                                     rehypePlugins={[rehypeRaw]}
@@ -995,7 +1006,7 @@ export const ArticleEditor: React.FC = () => {
                                     <X size={16} />
                                 </Button>
                             </div>
-                            <div className="flex-1 overflow-auto p-8 font-mono text-sm leading-relaxed text-foreground/80 whitespace-pre-wrap selection:bg-indigo-500/20">
+                            <div className="flex-1 overflow-auto p-8 font-mono text-sm leading-relaxed text-foreground/80 whitespace-pre-wrap selection:bg-indigo-500 selection:text-white">
                                 {article?.rawTranscript}
                             </div>
                             <div className="p-6 border-t border-border/40 bg-muted/30 flex justify-end">
@@ -1094,7 +1105,7 @@ const InfoPanelContent = ({
                                 type="text"
                                 value={seoTitle}
                                 onChange={(e) => setSeoTitle(e.target.value)}
-                                className="w-full text-sm bg-background/50 border border-border/50 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500/50 text-foreground transition-all shadow-sm"
+                                className="w-full text-sm bg-background/50 border border-border/50 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500/50 text-foreground transition-all shadow-sm selection:bg-indigo-500 selection:text-white"
                                 placeholder="Enter SEO title..."
                             />
                         </div>
@@ -1104,7 +1115,7 @@ const InfoPanelContent = ({
                                 value={seoDescription}
                                 onChange={(e) => setSeoDescription(e.target.value)}
                                 rows={4}
-                                className="w-full text-sm bg-background/50 border border-border/50 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500/50 text-foreground transition-all resize-none shadow-sm"
+                                className="w-full text-sm bg-background/50 border border-border/50 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500/50 text-foreground transition-all resize-none shadow-sm selection:bg-indigo-500 selection:text-white"
                                 placeholder="Enter meta description..."
                             />
                         </div>
@@ -1114,7 +1125,7 @@ const InfoPanelContent = ({
                                 type="text"
                                 value={category}
                                 onChange={(e) => setCategory(e.target.value)}
-                                className="w-full text-sm bg-background/50 border border-border/50 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500/50 text-foreground transition-all shadow-sm"
+                                className="w-full text-sm bg-background/50 border border-border/50 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500/50 text-foreground transition-all shadow-sm selection:bg-indigo-500 selection:text-white"
                                 placeholder="Article category..."
                             />
                         </div>
@@ -1134,7 +1145,7 @@ const InfoPanelContent = ({
                                 value={linkedinTeaser}
                                 onChange={(e) => setLinkedinTeaser(e.target.value)}
                                 rows={5}
-                                className="w-full text-sm bg-background/50 border border-border/50 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500/50 text-foreground transition-all resize-none shadow-sm"
+                                className="w-full text-sm bg-background/50 border border-border/50 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500/50 text-foreground transition-all resize-none shadow-sm selection:bg-indigo-500 selection:text-white"
                                 placeholder="LinkedIn teaser content..."
                             />
                         </div>
@@ -1154,7 +1165,7 @@ const InfoPanelContent = ({
                                 rows={5}
                                 maxLength={319}
                                 className={cn(
-                                    "w-full text-sm bg-background/50 border rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 transition-all resize-none shadow-sm",
+                                    "w-full text-sm bg-background/50 border rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 transition-all resize-none shadow-sm selection:bg-indigo-500 selection:text-white",
                                     xingSummary.length >= 319
                                         ? "border-amber-500/50 focus:ring-amber-500/20 focus:border-amber-500"
                                         : "border-border/50 focus:ring-emerald-500/20 focus:border-emerald-500/50"

@@ -2,6 +2,7 @@ import { GoogleGenAI } from '@google/genai';
 import dotenv from 'dotenv';
 import { aiResponseSchema, responseSchema, SYSTEM_INSTRUCTION, ValidatedArticle } from './aiConfig';
 import logger from '../utils/logger';
+import { repairTruncatedJson } from '../utils/jsonHelper';
 
 dotenv.config();
 
@@ -31,6 +32,7 @@ Link zum YouTube Video: ${videoUrl}`;
                 responseMimeType: 'application/json',
                 responseSchema: responseSchema,
                 systemInstruction: SYSTEM_INSTRUCTION,
+                maxOutputTokens: 8192,
             },
         });
 
@@ -39,7 +41,15 @@ Link zum YouTube Video: ${videoUrl}`;
             throw new Error("AI hat keine Antwort zurückgegeben.");
         }
 
-        const jsonData = JSON.parse(text);
+        let jsonData;
+        try {
+            jsonData = JSON.parse(text);
+        } catch (e) {
+            logger.warn(`[YouTube Extractor] Truncated JSON detected, attempting repair...`);
+            const repaired = repairTruncatedJson(text);
+            jsonData = JSON.parse(repaired);
+        }
+
         return aiResponseSchema.parse(jsonData);
     } catch (error: any) {
         logger.error(`[YouTube Extractor Error] Failed to process ${videoUrl}: ${error.message}`);

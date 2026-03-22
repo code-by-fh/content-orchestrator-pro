@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Outlet, NavLink, useLocation } from 'react-router-dom';
-import { LayoutDashboard, FileText, Settings, LogOut, ChevronRight, Search, Menu, X } from 'lucide-react';
+import { LayoutDashboard, FileText, Settings, LogOut, ChevronRight, Search, Menu, X, User } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Button } from './ui/Button';
 import { ThemeToggle } from './ui/ThemeToggle';
@@ -142,6 +142,7 @@ export const DashboardLayout = () => {
 
                     <NavItem to="/dashboard" icon={LayoutDashboard} label="Dashboard" collapsed={collapsed && !isMobile} end />
                     <NavItem to="/dashboard/articles" icon={FileText} label="Articles" collapsed={collapsed && !isMobile} activePattern="/dashboard/editor" />
+                    <NavItem to="/dashboard/profile" icon={User} label="Profile" collapsed={collapsed && !isMobile} />
                     <NavItem to="/dashboard/settings" icon={Settings} label="Settings" collapsed={collapsed && !isMobile} />
                 </div>
 

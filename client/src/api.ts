@@ -81,8 +81,8 @@ export const getArticle = async (id: string): Promise<Article> => {
     return response.data;
 };
 
-export const createArticle = async (url: string, type: 'YOUTUBE' | 'MEDIUM'): Promise<Article> => {
-    const response = await api.post('/content', { url, type });
+export const createArticle = async (data: { url?: string, type: 'YOUTUBE' | 'MEDIUM' | 'CUSTOM', content?: string }): Promise<Article> => {
+    const response = await api.post('/content', data);
     return response.data;
 };
 
@@ -90,8 +90,8 @@ export const deleteArticle = async (id: string): Promise<void> => {
     await api.delete(`/content/${id}`);
 };
 
-export const reprocessArticle = async (id: string): Promise<{ message: string }> => {
-    const response = await api.post(`/content/${id}/reprocess`);
+export const reprocessArticle = async (id: string, additionalInstructions?: string): Promise<{ message: string }> => {
+    const response = await api.post(`/content/${id}/reprocess`, { additionalInstructions });
     return response.data;
 };
 
@@ -117,6 +117,24 @@ export const unpublishAllFromArticle = async (id: string): Promise<{ message: st
 
 export const getShareUrl = async (id: string, platform: string, language: string = 'DE'): Promise<{ shareUrl: string }> => {
     const response = await api.get(`/content/${id}/share-url`, { params: { platform, language } });
+    return response.data;
+};
+
+export interface AppSettings {
+    id: string;
+    useOpenRouter: boolean;
+    openrouterApiKey: string | null;
+    openrouterModel: string | null;
+    openrouterBaseUrl: string | null;
+}
+
+export const getSettings = async (): Promise<AppSettings> => {
+    const response = await api.get('/settings');
+    return response.data;
+};
+
+export const updateSettings = async (data: Partial<Omit<AppSettings, 'id'>>): Promise<AppSettings> => {
+    const response = await api.put('/settings', data);
     return response.data;
 };
 

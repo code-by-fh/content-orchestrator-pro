@@ -8,8 +8,15 @@ const prisma = new PrismaClient();
 
 const loginSchema = z.object({
     username: z.string().min(3),
-    password: z.string().min(6),
+    password: z.string().min(1),
 });
+
+const userSchema = z.object({
+    username: z.string().min(3),
+    password: z.string().min(6),
+    role: z.nativeEnum(Role).optional(),
+});
+
 
 export const checkInitialSetup = async (req: Request, res: Response) => {
     try {
@@ -27,7 +34,7 @@ export const registerInitialAdmin = async (req: Request, res: Response) => {
             return res.status(400).json({ message: 'Initial setup already completed' });
         }
 
-        const { username, password } = loginSchema.parse(req.body);
+        const { username, password } = userSchema.parse(req.body);
         const passwordHash = await bcrypt.hash(password, 10);
 
         const user = await prisma.user.create({
@@ -76,13 +83,7 @@ export const login = async (req: Request, res: Response) => {
         );
         res.json({ token, user: { id: user.id, username: user.username, role: user.role } });
     } catch (error: any) {
-        if (error instanceof z.ZodError) {
-            return res.status(400).json({
-                message: 'Validation failed',
-                errors: error.errors.map(e => ({ path: e.path, message: e.message }))
-            });
-        }
-        res.status(400).json({ message: 'Invalid request' });
+        res.status(401).json({ message: 'Invalid credentials' });
     }
 };
 
@@ -103,11 +104,7 @@ export const createUser = async (req: any, res: Response) => {
     }
 
     try {
-        const { username, password, role } = z.object({
-            username: z.string().min(3),
-            password: z.string().min(6),
-            role: z.nativeEnum(Role).optional(),
-        }).parse(req.body);
+        const { username, password, role } = userSchema.parse(req.body);
 
         const existingUser = await prisma.user.findUnique({ where: { username } });
         if (existingUser) {

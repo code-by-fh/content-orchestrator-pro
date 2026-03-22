@@ -55,7 +55,7 @@ Content Orchestrator Pro is a powerful content orchestration platform designed s
 5.  **Login:**
     By default available at `http://localhost:5173`
     -   **Username:** `admin`
-    -   **Password:** `123`
+    -   **Password:** `admin`
 
 ## 🛠️ How It Works
 

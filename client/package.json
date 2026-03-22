@@ -10,6 +10,11 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@codemirror/commands": "^6.10.3",
+    "@codemirror/lang-markdown": "^6.5.0",
+    "@codemirror/language": "^6.12.2",
+    "@codemirror/state": "^6.6.0",
+    "@codemirror/view": "^6.40.0",
     "@radix-ui/react-label": "^2.1.8",
     "@radix-ui/react-slot": "^1.2.4",
     "@tailwindcss/typography": "^0.5.19",
@@ -19,6 +24,7 @@
     "axios": "^1.13.5",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
+    "codemirror": "^6.0.2",
     "framer-motion": "^12.34.0",
     "lucide-react": "^0.563.0",
     "react": "^19.2.0",

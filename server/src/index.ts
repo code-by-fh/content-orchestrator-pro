@@ -7,6 +7,7 @@ import fs from 'fs';
 import authRoutes from './routes/authRoutes';
 import contentRoutes from './routes/contentRoutes';
 import distributionRoutes from './routes/distributionRoutes';
+import settingsRoutes from './routes/settingsRoutes';
 import { generalLimiter } from './middleware/rateLimit';
 import { initScheduler } from './services/scheduler';
 import logger from './utils/logger';
@@ -32,6 +33,7 @@ app.use(generalLimiter);
 
 app.use('/api/auth', authRoutes);
 app.use('/api/content', contentRoutes);
+app.use('/api/settings', settingsRoutes);
 app.use('/api', distributionRoutes);
 
 const uploadsPath = path.join(__dirname, '../uploads');

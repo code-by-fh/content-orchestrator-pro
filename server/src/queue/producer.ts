@@ -8,6 +8,25 @@ export const contentQueue = new Queue('content-queue', {
     },
 });
 
-export const addContentJob = async (articleId: string, type: 'YOUTUBE' | 'MEDIUM', sourceUrl: string) => {
-    await contentQueue.add('generate-content', { articleId, type, sourceUrl });
+export const addContentJob = async (
+    articleId: string,
+    type: 'YOUTUBE' | 'MEDIUM' | 'CUSTOM',
+    sourceUrl: string,
+    options?: { additionalInstructions?: string; useRawTranscript?: boolean }
+) => {
+    await contentQueue.add('generate-content', {
+        articleId,
+        type,
+        sourceUrl,
+        additionalInstructions: options?.additionalInstructions,
+        useRawTranscript: options?.useRawTranscript,
+    }, {
+        attempts: 3,
+        backoff: {
+            type: 'exponential',
+            delay: 5000,
+        },
+        removeOnComplete: true,
+        removeOnFail: false
+    });
 };

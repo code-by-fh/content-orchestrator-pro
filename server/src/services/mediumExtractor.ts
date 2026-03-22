@@ -3,19 +3,12 @@ import * as cheerio from 'cheerio';
 
 export const extractMediumContent = async (url: string): Promise<string> => {
     try {
-        // Transform URL to freedium
         const freediumUrl = `https://freedium-mirror.cfd/${url}`;
 
-        // Fetch content
-        const { data } = await axios.get(freediumUrl);
+        const { data } = await axios.get(freediumUrl, { timeout: 60000 });
 
-        // Parse HTML
         const $ = cheerio.load(data);
 
-        // Specific logic for freedium structure
-        // Freedium usually renders the medium content in a container.
-
-        // Remove unwanted elements
         $('script').remove();
         $('style').remove();
         $('nav').remove();

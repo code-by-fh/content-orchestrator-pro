@@ -17,9 +17,12 @@ import { Tooltip } from './ui/Tooltip';
 export const ArticleList: React.FC = () => {
     const queryClient = useQueryClient();
     const [url, setUrl] = useState('');
+    const [customText, setCustomText] = useState('');
+    const [inputMode, setInputMode] = useState<'url' | 'text'>('url');
     const [confirmDeleteItem, setConfirmDeleteItem] = useState<{ id: string, isPublished: boolean, isScheduled: boolean } | null>(null);
     const [confirmUnpublishItem, setConfirmUnpublishItem] = useState<{ id: string } | null>(null);
     const [confirmReprocessItem, setConfirmReprocessItem] = useState<{ id: string } | null>(null);
+    const [reprocessInstructions, setReprocessInstructions] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
     const [showOnlyPublished, setShowOnlyPublished] = useState(false);
 
@@ -63,13 +66,14 @@ export const ArticleList: React.FC = () => {
 
 
     const createMutation = useMutation({
-        mutationFn: (variables: { url: string, type: 'YOUTUBE' | 'MEDIUM' }) => createArticle(variables.url, variables.type),
+        mutationFn: (variables: { url?: string, type: 'YOUTUBE' | 'MEDIUM' | 'CUSTOM', content?: string }) => createArticle(variables),
         onMutate: () => {
             toast.loading("Starting content generation...", { id: "create-article" });
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['articles'] });
             setUrl('');
+            setCustomText('');
             toast.success("Content generation started!", { id: "create-article" });
         },
         onError: (error) => {
@@ -111,7 +115,8 @@ export const ArticleList: React.FC = () => {
     });
 
     const reprocessMutation = useMutation({
-        mutationFn: (id: string) => reprocessArticle(id),
+        mutationFn: ({ id, additionalInstructions }: { id: string; additionalInstructions?: string }) =>
+            reprocessArticle(id, additionalInstructions),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['articles'] });
             toast.success("Processing started");
@@ -126,22 +131,28 @@ export const ArticleList: React.FC = () => {
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        if (!url) return;
 
-        let detectedType: 'YOUTUBE' | 'MEDIUM' | null = null;
+        if (inputMode === 'url') {
+            if (!url) return;
+            let detectedType: 'YOUTUBE' | 'MEDIUM' | null = null;
+            if (url.includes('youtube.com') || url.includes('youtu.be')) {
+                detectedType = 'YOUTUBE';
+            } else if (url.includes('medium.com')) {
+                detectedType = 'MEDIUM';
+            }
 
-        if (url.includes('youtube.com') || url.includes('youtu.be')) {
-            detectedType = 'YOUTUBE';
-        } else if (url.includes('medium.com')) {
-            detectedType = 'MEDIUM';
+            if (!detectedType) {
+                toast.error("Invalid URL. Only YouTube and Medium links are supported.");
+                return;
+            }
+            createMutation.mutate({ url, type: detectedType });
+        } else {
+            if (!customText) {
+                toast.error("Please enter a transcript or text.");
+                return;
+            }
+            createMutation.mutate({ type: 'CUSTOM', content: customText });
         }
-
-        if (!detectedType) {
-            toast.error("Invalid URL. Only YouTube and Medium links are supported.");
-            return;
-        }
-
-        createMutation.mutate({ url, type: detectedType });
     };
 
     return (
@@ -153,24 +164,71 @@ export const ArticleList: React.FC = () => {
             </div>
 
             {/* Input Area */}
-            <div className="relative group w-full">
-                <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/10 to-purple-600/10 rounded-xl blur-xl opacity-0 group-hover:opacity-100 transition duration-500"></div>
-                <div className="relative flex flex-col md:flex-row items-stretch md:items-center gap-2 bg-card/50 backdrop-blur-xl rounded-xl p-2 border border-white/10 shadow-2xl">
-                    <input
-                        type="text"
-                        placeholder="Paste YouTube or Medium URL here..."
-                        value={url}
-                        onChange={(e) => setUrl(e.target.value)}
-                        className="flex-1 bg-transparent border-none px-4 py-3 text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-0 min-w-0"
-                    />
-                    <Button
-                        onClick={handleSubmit}
-                        disabled={createMutation.isPending || !url}
-                        className="rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground px-6 py-3 md:py-2 shadow-lg shadow-indigo-500/20 transition-all w-full md:w-auto justify-center"
+            <div className="space-y-4">
+                <div className="flex items-center gap-1 p-1 bg-white/5 border border-white/5 rounded-lg w-fit">
+                    <button
+                        onClick={() => setInputMode('url')}
+                        className={cn(
+                            "px-3 py-1.5 text-xs font-medium rounded-md transition-all",
+                            inputMode === 'url' ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                        )}
                     >
-                        {createMutation.isPending ? <Loader2 className="animate-spin" /> : <Plus />}
-                        <span className="ml-2">Generate</span>
-                    </Button>
+                        From Link
+                    </button>
+                    <button
+                        onClick={() => setInputMode('text')}
+                        className={cn(
+                            "px-3 py-1.5 text-xs font-medium rounded-md transition-all",
+                            inputMode === 'text' ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                        )}
+                    >
+                        From Text
+                    </button>
+                </div>
+
+                <div className="relative group w-full">
+                    <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/10 to-purple-600/10 rounded-xl blur-xl opacity-0 group-hover:opacity-100 transition duration-500"></div>
+                    <div className="relative flex flex-col gap-2 bg-card/50 backdrop-blur-xl rounded-xl p-3 border border-white/10 shadow-2xl">
+                        {inputMode === 'url' ? (
+                            <div className="flex flex-col md:flex-row items-stretch md:items-center gap-2">
+                                <input
+                                    type="text"
+                                    placeholder="Paste YouTube or Medium URL here..."
+                                    value={url}
+                                    onChange={(e) => setUrl(e.target.value)}
+                                    className="flex-1 bg-transparent border-none px-4 py-3 text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-0 min-w-0"
+                                    onKeyDown={(e) => e.key === 'Enter' && handleSubmit(e)}
+                                />
+                                <Button
+                                    onClick={handleSubmit}
+                                    disabled={createMutation.isPending || !url}
+                                    className="rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground px-6 py-3 md:py-2 shadow-lg shadow-indigo-500/20 transition-all w-full md:w-auto justify-center"
+                                >
+                                    {createMutation.isPending ? <Loader2 className="animate-spin" /> : <Plus />}
+                                    <span className="ml-2">Generate</span>
+                                </Button>
+                            </div>
+                        ) : (
+                            <div className="flex flex-col gap-3">
+                                <textarea
+                                    placeholder="Paste your transcript or text here..."
+                                    value={customText}
+                                    onChange={(e) => setCustomText(e.target.value)}
+                                    className="w-full bg-transparent border-none px-4 py-3 text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-0 min-h-[120px] resize-none"
+                                />
+                                <div className="flex justify-end">
+                                    <Button
+                                        onClick={handleSubmit}
+                                        disabled={createMutation.isPending || !customText}
+                                        className="rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground px-6 py-2 shadow-lg shadow-indigo-500/20 transition-all w-full md:w-auto justify-center"
+                                    >
+                                        {createMutation.isPending ? <Loader2 className="animate-spin" /> : <Plus />}
+                                        <span className="ml-2">Generate from Text</span>
+                                    </Button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
 
@@ -232,7 +290,9 @@ export const ArticleList: React.FC = () => {
                                             <div className="flex items-center gap-4 overflow-hidden flex-1 min-w-0 w-full">
                                                 <div className={cn(
                                                     "h-10 w-10 rounded-full flex items-center justify-center shrink-0",
-                                                    article.sourceUrl?.includes('youtu') ? "bg-red-500/10 text-red-500" : "bg-white/10 text-foreground"
+                                                    article.sourceUrl?.includes('youtu') ? "bg-red-500/10 text-red-500" :
+                                                    article.sourceUrl === 'custom' ? "bg-indigo-500/10 text-indigo-400" :
+                                                    "bg-white/10 text-foreground"
                                                 )}>
                                                     {article.sourceUrl?.includes('youtu') ? <Youtube size={18} /> : <FileText size={18} />}
                                                 </div>
@@ -293,7 +353,7 @@ export const ArticleList: React.FC = () => {
                                                         onUnpublish={(id) => setConfirmUnpublishItem({ id })}
                                                         onReprocess={() => setConfirmReprocessItem({ id: article.id })}
                                                         isUnpublishing={unpublishMutation.isPending && unpublishMutation.variables === article.id}
-                                                        isReprocessing={reprocessMutation.isPending && reprocessMutation.variables === article.id}
+                                                        isReprocessing={reprocessMutation.isPending && reprocessMutation.variables?.id === article.id}
                                                     />
                                                 </div>
                                             </div>
@@ -373,19 +433,36 @@ export const ArticleList: React.FC = () => {
 
             <ConfirmationModal
                 isOpen={!!confirmReprocessItem}
-                onClose={() => setConfirmReprocessItem(null)}
+                onClose={() => { setConfirmReprocessItem(null); setReprocessInstructions(''); }}
                 onConfirm={() => {
                     if (confirmReprocessItem) {
-                        reprocessMutation.mutate(confirmReprocessItem.id);
+                        reprocessMutation.mutate({
+                            id: confirmReprocessItem.id,
+                            additionalInstructions: reprocessInstructions.trim() || undefined,
+                        });
                         setConfirmReprocessItem(null);
+                        setReprocessInstructions('');
                     }
                 }}
-                title="Reprocess Article"
-                description="Do you want to re-generate this article? This will overwrite the current content with a fresh AI-generated version based on the original source."
-                confirmLabel="Reprocess"
+                title="Artikel neu generieren"
+                description="Der Artikel wird auf Basis des gespeicherten Original-Transkripts neu generiert. Bisheriger Inhalt wird überschrieben."
+                confirmLabel="Neu generieren"
                 variant="info"
                 isLoading={reprocessMutation.isPending}
-            />
+            >
+                <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-muted-foreground">
+                        Zusätzliche Anweisungen <span className="font-normal">(optional)</span>
+                    </label>
+                    <textarea
+                        value={reprocessInstructions}
+                        onChange={(e) => setReprocessInstructions(e.target.value)}
+                        placeholder="z.B. Fokus stärker auf Praxisbeispiele, kürzere Einleitung, mehr Code-Snippets..."
+                        rows={3}
+                        className="w-full rounded-lg border border-border/60 bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/60 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+                    />
+                </div>
+            </ConfirmationModal>
         </div>
     );
 };

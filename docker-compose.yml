@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   client:
     build:
@@ -10,11 +8,12 @@ services:
     container_name: content-orchestrator-client
     restart: always
     ports:
-      - "3000:3000"
+      - "3001:3000"
     environment:
       VITE_API_URL: "${VITE_API_URL:-http://localhost:3003/api}"
     depends_on:
-      - server
+      server:
+        condition: service_started
 
   server:
     build:
@@ -25,29 +24,36 @@ services:
     ports:
       - "3003:3003"
     environment:
-      DATABASE_URL: "postgresql://postgres:postgrespassword@db:5432/content_orchestrator?schema=public"
-      JWT_SECRET: "changeme_in_prod"
-      GEMINI_API_KEY: "${GEMINI_API_KEY}" # Pass via .env or shell
-      REDIS_HOST: "redis"
-      REDIS_PORT: 6379
-      REDIS_PASSWORD: "${REDIS_PASSWORD:-redispassword}"
-      PORT: 3003
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgrespassword}@db:5432/${POSTGRES_DB:-content_orchestrator}
+      - JWT_SECRET=changeme_in_prod
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-redispassword}
+      - PORT=3003
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
   db:
     image: postgres:15-alpine
     container_name: content-orchestrator-db
     restart: always
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgrespassword
-      POSTGRES_DB: content_orchestrator
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgrespassword}
+      POSTGRES_DB: ${POSTGRES_DB:-content_orchestrator}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-content_orchestrator}" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   redis:
     image: redis:alpine
@@ -58,6 +64,11 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
 volumes:
   postgres_data:

@@ -74,6 +74,14 @@ model Article {
   publications Publication[]
 }
 
+model AppSettings {
+  id                String  @id @default("singleton")
+  useOpenRouter     Boolean @default(false)
+  openrouterApiKey  String?
+  openrouterModel   String? @default("openai/gpt-4o-mini")
+  openrouterBaseUrl String? @default("https://openrouter.ai/api/v1")
+}
+
 model Publication {
   id           String            @id @default(uuid())
   articleId    String

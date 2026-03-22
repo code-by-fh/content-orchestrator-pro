@@ -47,25 +47,35 @@ User submits URL → Express API → BullMQ Queue (Redis) → Worker Process
 
 ### Key Components
 
-**`server/src/index.ts`** — Express entry point (default port 3003). Registers routes under `/api/auth`, `/api/content`, `/api/distribution`. Serves uploaded images at `/uploads`.
+**`server/src/index.ts`** — Express entry point (default port 3003). Registers routes under `/api/auth`, `/api/content`, `/api/settings`, `/api/distribution`. Imports worker in-process and initializes the scheduler. Serves uploaded images at `/uploads`.
 
-**`server/src/worker.ts`** — BullMQ worker that runs as a separate process. Consumes `content-queue` from Redis, extracts source content, calls Gemini, validates with Zod, and updates article status (`PENDING → PROCESSING → DRAFT | FAILED`).
+**`server/src/worker.ts`** — BullMQ worker (imported in-process by `index.ts`, also runnable standalone via `npm run worker`). Consumes `content-queue` from Redis, extracts source content, calls Gemini or OpenRouter (based on `AppSettings`), validates with Zod, and updates article status (`PENDING → PROCESSING → DRAFT | FAILED`).
 
-**`server/src/services/aiConfig.ts`** — Gemini configuration with structured JSON schema. Outputs: `markdownContent`, `linkedinTeaser`, `xingSummary`, `seoTitle`, `seoDescription`, `slug`, `category`, `rawTranscript`.
+**`server/src/services/aiConfig.ts`** — AI configuration shared by worker and translation service. Defines Zod schema, Gemini JSON schema, `SYSTEM_INSTRUCTION`, `OPENROUTER_JSON_SUFFIX` (for JSON-mode OpenRouter calls), and `buildSystemInstruction()` (merges base + per-job instructions). Outputs: `markdownContent`, `linkedinTeaser`, `xingSummary`, `seoTitle`, `seoDescription`, `slug`, `category`, `rawTranscript`.
+
+**`server/src/services/scheduler.ts`** — node-cron job (every minute) that auto-publishes articles whose `scheduledAt` timestamp has passed. Clears `scheduledAt` and publishes to LinkedIn via `publishingService`.
+
+**`server/src/services/translationService.ts`** — Translates a DE article to English using Gemini. Populates the `*En` caching fields on `Article` (`titleEn`, `markdownContentEn`, `linkedinTeaserEn`, `xingSummaryEn`, `seoTitleEn`, `seoDescriptionEn`).
 
 **`server/src/services/publishingService.ts`** — Orchestrates multi-platform distribution. Handles image uploads to CMS (Directus-compatible), rewrites Markdown image links to production URLs, and delegates to platform adapters.
 
 **`server/src/services/adapters/`** — Platform-specific publishing adapters (LinkedIn, Medium, Xing, RSS, Webhook). Follows adapter pattern for extensibility.
 
-**`server/prisma/schema.prisma`** — Three main models: `User` (JWT auth), `Article` (content with DE/EN fields and status tracking), `Publication` (per-platform distribution records with status `PENDING → PUBLISHED | ERROR`).
+**`server/src/routes/settingsRoutes.ts`** — GET/PUT `/api/settings` for reading and updating the singleton `AppSettings` record. PUT is restricted to ADMIN role.
 
-**`client/src/App.tsx`** — React Router v7 setup with protected routes. Dashboard, Editor, Settings views.
+**`server/prisma/schema.prisma`** — Four main models: `User` (JWT auth with `Role` enum), `Article` (DE content + EN caching fields + `scheduledAt`), `AppSettings` (singleton row for OpenRouter config: `useOpenRouter`, `openrouterApiKey`, `openrouterModel`, `openrouterBaseUrl`), `Publication` (per-platform distribution records with status `PENDING → PUBLISHED | ERROR`).
+
+**`client/src/App.tsx`** — React Router v7 setup with protected routes. Routes: Dashboard overview, Articles list, Article editor, Settings, Profile.
+
+**`client/src/components/Profile.tsx`** — User profile page: displays username/role, password change form, and theme toggle.
 
 **`client/src/api.ts`** — Axios client pointing to `VITE_API_URL`. All API calls go through here.
 
 ### Environment Variables
 
 Server (`.env`): `DATABASE_URL`, `PORT`, `JWT_SECRET`, `GEMINI_API_KEY`, `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD`, `PUBLIC_ARTICLE_BASE_URL`, `BACKEND_URL`, `WEBHOOK_URL`, `WEBHOOK_API_KEY`, `CONTENT_MANAGEMENT_IMAGE_URL`, `CONTENT_MANAGEMENT_TOKEN`, `WHITELISTED_DOMAINS`
+
+OpenRouter settings (`useOpenRouter`, `openrouterApiKey`, `openrouterModel`, `openrouterBaseUrl`) are stored in the `AppSettings` DB table, not in `.env`.
 
 Client (`.env`): `VITE_API_URL`
 
@@ -87,3 +97,11 @@ Design philosophy: **"Harmonized Adaptive Depth"** — paper-like light mode, gl
 - **Theme toggle**: Fixed bottom-left or sidebar footer placement
 
 Full design rules are in `.agent/rules/styling-only.md`.
+
+# Important Notes
+- if you made any changes to a backend file, you need to restart the server container
+- if you made any changes to a frontend file, you need to restart the frontend container
+- if you made any changes in the database, you need to restart the database container
+- if you made any changes to the redis, you need to restart the redis container
+- if you made any changes in the docker-compose.yml file, you need to restart the docker-compose file
+- if you create any database migration, you need run the migration to apply the changes to the database

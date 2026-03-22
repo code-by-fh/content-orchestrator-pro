@@ -9,16 +9,17 @@ import logger from '../utils/logger';
 const prisma = new PrismaClient();
 
 const createContentSchema = z.object({
-    url: z.string().url(),
-    type: z.enum(['YOUTUBE', 'MEDIUM']),
+    url: z.string().url().optional().or(z.literal('')),
+    type: z.enum(['YOUTUBE', 'MEDIUM', 'CUSTOM']),
+    content: z.string().optional(),
     title: z.string().optional(), // Optional initial title
 });
 
 export const createContent = async (req: Request, res: Response) => {
     try {
-        const { url, type, title } = createContentSchema.parse(req.body);
+        const { url, type, title, content } = createContentSchema.parse(req.body);
 
-        logger.info(`[Content] Received request to generate article from ${type} URL: ${url}`);
+        logger.info(`[Content] Received request to generate article from ${type}${url ? ' (URL: ' + url + ')' : ''}`);
 
         let slug = title ? title.toLowerCase().replace(/ /g, '-') : `draft-${Date.now()}`;
 
@@ -26,14 +27,13 @@ export const createContent = async (req: Request, res: Response) => {
             data: {
                 title: title || 'New Draft',
                 slug: slug,
-                sourceUrl: url,
-                rawTranscript: '',
+                sourceUrl: url || 'custom',
+                rawTranscript: content || '',
                 processingStatus: 'PENDING',
             },
         });
 
-
-        await addContentJob(article.id, type, url);
+        await addContentJob(article.id, type, url || 'custom', { useRawTranscript: type === 'CUSTOM' });
 
         logger.info(`[Content] Successfully queued job for new article (ID: ${article.id})`);
 
@@ -253,6 +253,7 @@ export const updateArticle = async (req: Request, res: Response) => {
 
 export const reprocessArticle = async (req: Request, res: Response) => {
     const { id } = req.params;
+    const { additionalInstructions } = req.body;
     logger.info(`[Content] Received request to reprocess article (ID: ${id})`);
 
     try {
@@ -269,9 +270,13 @@ export const reprocessArticle = async (req: Request, res: Response) => {
             type = 'MEDIUM';
         }
 
-        await addContentJob(article.id, type, article.sourceUrl);
+        const useRawTranscript = !!article.rawTranscript;
+        await addContentJob(article.id, type, article.sourceUrl, {
+            additionalInstructions: additionalInstructions || undefined,
+            useRawTranscript,
+        });
 
-        logger.info(`[Content] Successfully re-queued job for article (ID: ${article.id})`);
+        logger.info(`[Content] Successfully re-queued job for article (ID: ${article.id}) | useRawTranscript: ${useRawTranscript}`);
 
         res.json({ message: 'Re-processing started' });
     } catch (error: any) {

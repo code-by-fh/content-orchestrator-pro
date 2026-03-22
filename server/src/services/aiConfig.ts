@@ -40,6 +40,25 @@ export const responseSchema = {
     ],
 };
 
+export const OPENROUTER_JSON_SUFFIX = `
+
+Antworte ausschließlich mit einem gültigen JSON-Objekt (kein Markdown-Block, keine Erklärungen) mit genau diesen Feldern:
+{
+  "markdownContent": "<Artikel im Markdown-Format>",
+  "linkedinTeaser": "<LinkedIn Teaser Text>",
+  "xingSummary": "<Xing Zusammenfassung, max. 319 Zeichen>",
+  "seoTitle": "<SEO-optimierter Titel>",
+  "seoDescription": "<Meta-Description, max. 160 Zeichen>",
+  "slug": "<URL-freundlicher Slug>",
+  "category": "<Kategorie des Artikels>",
+  "rawTranscript": "<Vollständiges Transkript oder bereinigter Quelltext>"
+}`;
+
+export const buildSystemInstruction = (additionalInstructions?: string): string => {
+    if (!additionalInstructions?.trim()) return SYSTEM_INSTRUCTION;
+    return `${SYSTEM_INSTRUCTION}\nZusätzliche Anweisungen für diese Generierung:\n${additionalInstructions.trim()}\n`;
+};
+
 export const SYSTEM_INSTRUCTION = `Handle als erfahrener Content-Marketer und Copywriter.
             
 Aufgabe:
@@ -51,7 +70,7 @@ Anforderungen:
 - Struktur: H1 (Titel), H2 (Kapitel), H3 (Unterkapitel), Bullet Points, Code-Beispiele
 - SEO: Relevante Keywords natürlich einbauen, kein Keyword-Stuffing
 - Formatierung: Markdown (keine HTML-Tags)
-- Länge: mindestens so viele Wörter wie im Quellmaterial vorhanden sind
+- Länge: Generiere IMMER einen vollständigen, ausführlichen und langen Fachartikel. Der Artikel darf unter keinen Umständen vorzeitig abgebrochen oder gekürzt werden. Behandle alle Aspekte des Quellmaterials detailliert und tiefgehend.
 
 Zusätzliche Outputs:
 - LinkedIn Teaser: Kurzer, knackiger Text (ca. 2-3 Sätze) für LinkedIn.
@@ -65,6 +84,7 @@ Zusätzliche Outputs:
 Wichtige Hinweise:
 - Achte auf korrekte Fachbegriffe.
 - Erkläre komplexe Konzepte verständlich.
+- Schreibe den Artikel IMMER vollständig zu Ende (z.B. mit einem Fazit). Ein abrupter Abbruch im Text ist ein Fehler.
 - Füge relevante Code-Beispiele nur ein, wenn sie einen echten Mehrwert bieten.
 - Generiere und füge KI-Prompts für Bilder nur ein, wenn sie einen Mehrwert für den Artikel bieten.
 - Strukturiere den Text logisch und lesefreundlich.

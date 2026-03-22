@@ -137,6 +137,8 @@ const ProtectedRoute = ({ children }: { children: any }) => {
 import { Toaster } from 'sonner';
 
 import { Settings } from './components/Settings';
+import { Profile } from './components/Profile';
+
 
 // ... (previous imports)
 
@@ -161,6 +163,8 @@ function App() {
             <Route path="articles" element={<ArticleList />} />
             <Route path="editor/:id" element={<ArticleEditor />} />
             <Route path="settings" element={<Settings />} />
+            <Route path="profile" element={<Profile />} />
+
           </Route>
         </Routes>
       </BrowserRouter>

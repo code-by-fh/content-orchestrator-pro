@@ -16,6 +16,7 @@ interface ConfirmationModalProps {
     cancelLabel?: string;
     variant?: ModalVariant;
     isLoading?: boolean;
+    children?: React.ReactNode;
 }
 
 export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
@@ -27,7 +28,8 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
     confirmLabel = 'Confirm',
     cancelLabel = 'Cancel',
     variant = 'info',
-    isLoading = false
+    isLoading = false,
+    children,
 }) => {
     const getIcon = () => {
         switch (variant) {
@@ -85,6 +87,8 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
                                 <X size={20} />
                             </button>
                         </div>
+
+                        {children && <div className="mt-4">{children}</div>}
 
                         <div className="flex items-center gap-3 mt-8">
                             <Button

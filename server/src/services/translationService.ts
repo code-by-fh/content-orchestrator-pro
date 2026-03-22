@@ -105,7 +105,8 @@ export async function translateArticleToEnglish(articleId: string): Promise<Arti
                 "xingSummaryEn": "...",
                 "markdownContentEn": "..."
             }
-            `
+            `,
+            maxOutputTokens: 8192,
         }
     });
 

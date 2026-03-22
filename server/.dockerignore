@@ -1,0 +1,39 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Node
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Docker
+docker-compose.yml
+Dockerfile
+.docker
+.dockerignore
+
+# Distribution
+dist/
+build/
+out/
+
+# Env
+.env
+.env.*
+!.env.example
+
+# OS / IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Project specific
+uploads/
+logs/
+prisma/migrations/
+!prisma/schema.prisma
