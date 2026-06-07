@@ -59,5 +59,7 @@ jobs:
           push: true
           tags: |
             doublelayer/content-orchestrator-client:${{ steps.vars.outputs.TAG }}
+          build-args: |
+            VITE_API_URL=${{ secrets.VITE_API_URL }}
           cache-from: type=gha,scope=client
           cache-to: type=gha,mode=max,scope=client
