@@ -109,8 +109,14 @@ export const ArticleEditor: React.FC = () => {
     const editorContainerRef = useRef<HTMLDivElement>(null);
     const previewRef = useRef<HTMLDivElement>(null);
     const isScrollingRef = useRef<boolean>(false);
-    // Stable refs for handlers used inside the CodeMirror mount effect
     const handleSaveRef = useRef<(isAutoSave?: boolean) => void>(() => {});
+    const selectionRef = useRef<any>(null);
+    const contentRef = useRef(content);
+    const lastArticleIdRef = useRef<string | undefined>(undefined);
+
+    useEffect(() => {
+        contentRef.current = content;
+    }, [content]);
 
     const { data: article, isLoading } = useQuery({
         queryKey: ['article', id],
@@ -321,13 +327,17 @@ export const ArticleEditor: React.FC = () => {
         return () => clearTimeout(timer);
     }, [content, seoTitle, seoDescription, linkedinTeaser, xingSummary]);
 
-    // CodeMirror mount effect — runs when the article is ready (container div in DOM)
+    // CodeMirror mount effect — runs when the article is ready (container div in DOM) or layout swaps
     useEffect(() => {
         if (!editorContainerRef.current || editorViewRef.current) return;
 
+        const isSameArticle = lastArticleIdRef.current === article?.id;
+        lastArticleIdRef.current = article?.id;
+
         const view = new EditorView({
             state: EditorState.create({
-                doc: article?.markdownContent ?? '',
+                doc: contentRef.current || (article?.markdownContent ?? ''),
+                selection: isSameArticle && selectionRef.current ? selectionRef.current : undefined,
                 extensions: [
                     history(),
                     imageDecorationExtension,
@@ -349,6 +359,9 @@ export const ArticleEditor: React.FC = () => {
                     EditorView.updateListener.of((u) => {
                         if (u.docChanged) {
                             setContent(u.state.doc.toString());
+                        }
+                        if (u.selectionSet) {
+                            selectionRef.current = u.state.selection;
                         }
                     }),
                     EditorView.domEventHandlers({
@@ -409,7 +422,7 @@ export const ArticleEditor: React.FC = () => {
             editorViewRef.current = null;
         };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [article?.id]); // Re-run when article loads so the container div is in the DOM
+    }, [article?.id, isSwapped, orientation]); // Re-run when article loads or layout swaps so editor mounts in new container
 
     const insertText = (before: string, after: string = '') => {
         const view = editorViewRef.current;
