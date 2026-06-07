@@ -35,5 +35,3 @@ Thumbs.db
 # Project specific
 uploads/
 logs/
-prisma/migrations/
-!prisma/schema.prisma
