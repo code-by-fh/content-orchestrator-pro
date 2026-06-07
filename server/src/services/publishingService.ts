@@ -172,15 +172,20 @@ class PublishingService {
             update: { status: 'PENDING', errorMessage: null }
         });
 
+        const getCleanText = (text: string | null) => {
+            if (!text) return text;
+            return text.replace(/\\n/g, '\n');
+        };
+
         // Use correct article content based on language selection
         let publishedArticle: any = {
             ...article,
             title: language === 'EN' ? (article.titleEn || article.title) : article.title,
             seoTitle: language === 'EN' ? (article.seoTitleEn || article.seoTitle) : article.seoTitle,
-            seoDescription: language === 'EN' ? (article.seoDescriptionEn || article.seoDescription) : article.seoDescription,
-            markdownContent: language === 'EN' ? (article.markdownContentEn || article.markdownContent) : article.markdownContent,
-            linkedinTeaser: language === 'EN' ? (article.linkedinTeaserEn || article.linkedinTeaser) : article.linkedinTeaser,
-            xingSummary: language === 'EN' ? (article.xingSummaryEn || article.xingSummary) : article.xingSummary,
+            seoDescription: language === 'EN' ? (getCleanText(article.seoDescriptionEn) || article.seoDescription) : article.seoDescription,
+            markdownContent: language === 'EN' ? (getCleanText(article.markdownContentEn) || article.markdownContent) : article.markdownContent,
+            linkedinTeaser: language === 'EN' ? (getCleanText(article.linkedinTeaserEn) || article.linkedinTeaser) : article.linkedinTeaser,
+            xingSummary: language === 'EN' ? (getCleanText(article.xingSummaryEn) || article.xingSummary) : article.xingSummary,
         };
 
         // Handle ogImageUrl if it's a local upload

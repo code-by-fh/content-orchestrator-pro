@@ -94,17 +94,7 @@ export async function translateArticleToEnglish(articleId: string): Promise<Arti
             - Ensure all technical terms are correctly translated to their standard English equivalents.
             - Keep the exact same Markdown formatting (headers, lists, bolding, code blocks, links).
             - Do not add or remove any information.
-            - Provide translations for all metadata fields (Title, SEO Title, SEO Description, LinkedIn Teaser, XING Summary) and the main Markdown Content.
-            
-            Output Format (JSON strictly matching the provided schema):
-            {
-                "titleEn": "...",
-                "seoTitleEn": "...",
-                "seoDescriptionEn": "...",
-                "linkedinTeaserEn": "...",
-                "xingSummaryEn": "...",
-                "markdownContentEn": "..."
-            }
+             Provide translations for all metadata fields (Title, SEO Title, SEO Description, LinkedIn Teaser, XING Summary) and the main Markdown Content.
             `,
             maxOutputTokens: 8192,
         }
@@ -119,16 +109,18 @@ export async function translateArticleToEnglish(articleId: string): Promise<Arti
     const jsonData = JSON.parse(text);
     const translatedData = translationResponseSchema.parse(jsonData);
 
+    const cleanText = (val: string) => val.replace(/\\n/g, '\n');
+
     // Update database with translated fields
     const updatedArticle = await prisma.article.update({
         where: { id: articleId },
         data: {
             titleEn: translatedData.titleEn,
-            markdownContentEn: translatedData.markdownContentEn,
-            linkedinTeaserEn: translatedData.linkedinTeaserEn,
-            xingSummaryEn: translatedData.xingSummaryEn,
+            markdownContentEn: cleanText(translatedData.markdownContentEn),
+            linkedinTeaserEn: cleanText(translatedData.linkedinTeaserEn),
+            xingSummaryEn: cleanText(translatedData.xingSummaryEn),
             seoTitleEn: translatedData.seoTitleEn,
-            seoDescriptionEn: translatedData.seoDescriptionEn,
+            seoDescriptionEn: cleanText(translatedData.seoDescriptionEn),
         }
     });
 
